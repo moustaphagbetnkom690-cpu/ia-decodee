@@ -65,10 +65,17 @@ export const metadata: Metadata = {
     title: siteConfig.name,
     description: siteConfig.description,
   },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  // NOTE : pas de `robots: { index: true }` ici.
+  //
+  // Le déclarer dans le layout racine l'appliquait à TOUTES les pages, y compris
+  // aux 404. Une URL inexistante émettait alors deux directives contradictoires :
+  // le « index, follow » du layout et le « noindex » que Next.js injecte
+  // lui-même sur les réponses 404 streamées. Google retient la plus restrictive,
+  // donc le résultat restait correct — mais il ne faut pas construire son
+  // référencement sur un arbitrage implicite.
+  //
+  // L'absence de directive vaut « indexable » : c'est déjà le comportement
+  // voulu, et le `noindex` des pages introuvables reste ainsi sans ambiguïté.
 };
 
 export const viewport: Viewport = {

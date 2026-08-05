@@ -89,7 +89,7 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
             type="email"
             required
             autoComplete="username"
-            placeholder="admin@ia-decodee.fr"
+            placeholder="admin@ia-decodee.tech"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="field pl-10"
