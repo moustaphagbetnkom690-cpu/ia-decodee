@@ -1,0 +1,126 @@
+import type { Metadata, Viewport } from 'next';
+import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google';
+import Script from 'next/script';
+import './globals.css';
+import { siteConfig } from '@/lib/site-config';
+
+/* Polices auto-hébergées via next/font. Elles étaient auparavant chargées par un
+   <link> vers Google Fonts placé dans le <head>, ce qui bloquait le rendu et
+   provoquait un saut de mise en page au chargement. Les fichiers sont désormais
+   servis depuis notre propre domaine, avec `display: swap`, et exposés en
+   variables CSS que le bloc @theme de globals.css consomme. */
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['600', '700'],
+  variable: '--font-display',
+  display: 'swap',
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '600'],
+  variable: '--font-mono-code',
+  display: 'swap',
+});
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: `${siteConfig.name} — Le média de l'Intelligence Artificielle`,
+    template: `%s — ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  keywords: [
+    'Intelligence Artificielle',
+    'IA',
+    'LLM',
+    'Prompt Engineering',
+    'Comparatif IA',
+    'Outils IA',
+    'Actualité IA France',
+  ],
+  authors: [{ name: siteConfig.author.name }],
+  creator: siteConfig.name,
+  publisher: siteConfig.name,
+  // NOTE : plus aucun `alternates.canonical` ici. Le déclarer dans le layout
+  // racine appliquait l'URL d'accueil comme canonical à TOUTES les pages, ce qui
+  // revenait à dire à Google que chaque article était un doublon de la page
+  // d'accueil. Chaque page définit désormais son propre canonical.
+  openGraph: {
+    type: 'website',
+    locale: 'fr_FR',
+    url: siteConfig.url,
+    title: `${siteConfig.name} — Le média de l'Intelligence Artificielle`,
+    description: siteConfig.description,
+    siteName: siteConfig.name,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteConfig.name,
+    description: siteConfig.description,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#0a0a0f',
+  colorScheme: 'dark',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  /*
+   * Layout RACINE — volontairement minimal.
+   *
+   * Il ne contient que <html>, <body> et les polices, c'est-a-dire ce qui est
+   * commun a TOUTES les sections du site. L'en-tete, le pied de page et le
+   * balisage JSON-LD ont ete deplaces dans `(public)/layout.tsx` : ils
+   * n'avaient rien a faire dans le back-office, ou ils affichaient a
+   * l'administrateur le menu des categories, le formulaire d'inscription a la
+   * newsletter et les mentions legales.
+   *
+   * `(public)` est un groupe de routes : les parentheses excluent le dossier de
+   * l'URL. Les adresses publiques restent donc inchangees (/blog, /contact...),
+   * seul le chrome qui les entoure differe.
+   */
+  return (
+    <html
+      lang="fr"
+      className={`${inter.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable}`}
+      suppressHydrationWarning
+    >
+      {/* suppressHydrationWarning : certaines extensions de navigateur
+          (Bitdefender, Grammarly, LastPass...) injectent des attributs dans le
+          DOM avant que React n'hydrate la page. React signale alors une
+          divergence serveur/client qui ne vient pas du code. L'attribut ne
+          masque que les differences d'attributs sur CET element. */}
+      <body
+        className="min-h-screen bg-base text-ink flex flex-col antialiased"
+        suppressHydrationWarning
+      >
+        {children}
+
+        {siteConfig.adsenseClientId && (
+          <Script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${siteConfig.adsenseClientId}`}
+            crossOrigin="anonymous"
+            strategy="afterInteractive"
+          />
+        )}
+      </body>
+    </html>
+  );
+}
