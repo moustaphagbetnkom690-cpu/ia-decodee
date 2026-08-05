@@ -1,31 +1,23 @@
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ia-decodee.fr";
-
-/*
- * Garde-fou de mise en production.
- *
- * NEXT_PUBLIC_SITE_URL alimente les URL canoniques, les balises OpenGraph et le
- * sitemap. Si elle reste sur localhost lors d'un build de production, Google
- * indexe des adresses inaccessibles et le partage sur les réseaux sociaux est
- * cassé — une erreur silencieuse et coûteuse. On échoue donc bruyamment au
- * build plutôt que de la découvrir après la mise en ligne.
- */
-if (
-  process.env.NODE_ENV === "production" &&
-  /localhost|127\.0\.0\.1/.test(siteUrl)
-) {
-  const message =
-    "NEXT_PUBLIC_SITE_URL pointe encore sur localhost. Renseignez le domaine " +
-    "public (ex. https://ia-decodee.fr) : sans cela, les URL canoniques, les " +
-    "aperçus de partage et le sitemap pointeront vers une adresse inaccessible.";
-
-  // Sur une plateforme de déploiement, l'erreur est bloquante : mieux vaut un
-  // build en échec qu'un site indexé sur localhost. En build local, un
-  // avertissement suffit — on teste souvent la production sur sa machine.
-  if (process.env.VERCEL || process.env.CI) {
-    throw new Error(message);
+function resolveSiteUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl && !/localhost|127\.0\.0\.1/.test(envUrl)) {
+    return envUrl.replace(/\/$/, "");
   }
-  console.warn(`\n⚠️  ${message}\n`);
+  // Vercel fournit automatiquement ces variables système
+  const vercelUrl =
+    process.env.NEXT_PUBLIC_VERCEL_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL;
+  if (vercelUrl) {
+    return `https://${vercelUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
+  }
+  if (process.env.NODE_ENV === "production") {
+    return "https://ia-decodee.fr";
+  }
+  return envUrl || "http://localhost:3000";
 }
+
+const siteUrl = resolveSiteUrl();
 
 export const siteConfig = {
   name: "IA Décodée",
