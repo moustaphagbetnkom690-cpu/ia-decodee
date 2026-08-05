@@ -25,10 +25,14 @@ bout dans un navigateur.
 | Comparatif des modèles IA 2026 | 32 min |
 | Bien rédiger un prompt | 14 min |
 
-**Base** : 1 compte `admin`, 6 commentaires, 0 abonné newsletter, compteurs de
-vues à zéro (les données de démonstration ont été purgées — tout est réel).
+**Base** : 1 compte `admin`, **0 commentaire**, 0 abonné newsletter, 2 vues
+réelles. Les 6 faux commentaires en `@example.com` (« Thomas Dubois », « Léa
+Martin », « Alexandre ») ont été purgés le 5 août 2026 — ils étaient bien en
+production, et en double.
 
-**Pas encore déployé.** `NEXT_PUBLIC_SITE_URL` vaut toujours `localhost:3000`.
+**EN LIGNE sur https://www.ia-decodee.tech** (Vercel). L'apex redirige en 308
+vers `www`. Le `.fr` avait dû être abandonné : l'AFNIC le réserve aux résidents
+de l'UE/EEE.
 
 ---
 
@@ -94,18 +98,54 @@ Ils font la valeur du site — les préserver.
 
 ## Ce qui reste à faire
 
-1. **Choisir et acheter le domaine** (`ia-decodee.fr` est la valeur par défaut
-   dans `site-config.ts`). Décision en attente côté utilisateur.
-2. **Déployer sur Vercel.** Renseigner `NEXT_PUBLIC_SITE_URL` — un garde-fou dans
-   `site-config.ts` **fait échouer le build** si elle reste sur localhost.
-   Ajouter les 3 clés Supabase, et l'URL de déploiement dans les *Redirect URLs*
-   de Supabase Auth.
-3. **Fermer les inscriptions publiques** dans Supabase (Authentication > Sign In /
+**Trois actions manuelles, à faire dans cet ordre — le site est en ligne.**
+
+1. **Exécuter `supabase_patch_securite.sql`** dans Supabase > SQL Editor. Tant
+   que ce n'est pas fait, n'importe qui peut injecter de fausses vues depuis un
+   pays inventé avec la seule clé publique (vérifié en conditions réelles).
+2. **Ajouter `SUPABASE_SERVICE_ROLE_KEY` aux variables Vercel.** Le comptage des
+   vues passe désormais par elle ; sans cette variable, il s'arrête en silence.
+3. **Corriger `NEXT_PUBLIC_SITE_URL` dans Vercel** → `https://www.ia-decodee.tech`
+   (portée Production). Elle valait l'URL `*.vercel.app` générée, ce qui envoyait
+   tout le référencement sur le mauvais domaine. Le garde-fou de
+   `site-config.ts` fait maintenant **échouer le build** sur `localhost` comme
+   sur `*.vercel.app`.
+
+Ensuite :
+
+4. **Fermer les inscriptions publiques** dans Supabase (Authentication > Sign In /
    Providers > Email).
-4. **Mettre à jour le comparatif après le 31 août 2026** : le tarif
+5. **Mettre à jour le comparatif après le 31 août 2026** : le tarif
    d'introduction de Claude Sonnet 5 ($2/$10) passe à $3/$15 — c'est écrit dans
    l'article, il deviendra faux.
-5. Éventuellement étoffer « Bien rédiger un prompt » (14 min contre 32 et 36).
+6. Éventuellement étoffer « Bien rédiger un prompt » (14 min contre 32 et 36).
+
+---
+
+## Décisions d'architecture issues de l'audit du 5 août 2026
+
+**Aucun repli sur des données fictives.** `mock-data.ts` a été supprimé. Si
+Supabase ne répond pas, les pages sont vides — jamais peuplées de faux contenu.
+Un site vide se remarque et se corrige ; un site faussement plein, non.
+
+**Aucun repli automatique sur `VERCEL_URL`** dans `site-config.ts`. C'est ce
+repli « intelligent » qui avait détourné canoniques et sitemap vers
+`*.vercel.app`. Le domaine public est une constante explicite.
+
+**Le soft-404 n'est PAS un bug à corriger.** Une URL d'article inexistante
+renvoie 200 et non 404 : c'est le comportement documenté de Next.js pour les
+réponses *streamées* (le `loading.tsx` ouvre une frontière Suspense, les en-têtes
+partent avant que `notFound()` ne soit résolu). Next injecte
+`<meta name="robots" content="noindex">`, **l'indexation est donc bien
+empêchée** — vérifié en production. La correction officielle imposerait une
+requête en base dans `proxy.ts` à chaque visite : coût permanent, bénéfice nul.
+Ne pas rouvrir ce sujet.
+
+**La limitation de débit est volontairement en mémoire** (`src/lib/rate-limit.ts`),
+donc par instance serverless. Suffisante contre le script isolé qui boucle,
+inopérante contre une attaque distribuée. Passer à Upstash ou à un compteur
+Postgres si le trafic hostile devient réel — la signature de `hit()` est faite
+pour que ce remplacement ne touche aucun appelant.
 
 ---
 

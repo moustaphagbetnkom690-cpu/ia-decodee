@@ -183,3 +183,38 @@ Ce journal permet à **Claude** et **Antigravity / Gemini** de suivre l'état ex
   - **Synchronisation Claude/Gemini** : Configuration de `CLAUDE.md` pointant vers `@gemini.md` et `@AGENTS.md` pour unifier le contexte partagé.
   - **Validation globale** : Toutes les routes testées en 200 OK, `npm run lint` à 0 erreur.
 
+
+---
+
+## Journal des synchronisations — 5 août 2026 (Claude)
+
+**Audit de sécurité complet du site en production, et correctifs.**
+
+Fichiers modifiés — à connaître avant toute intervention concurrente :
+
+| Fichier | Changement |
+|---|---|
+| `next.config.ts` | Ajout de `headers()` (CSP, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, HSTS) et de `poweredByHeader: false` |
+| `src/lib/site-config.ts` | **Repli sur `VERCEL_URL` retiré** + garde-fou de build restauré |
+| `src/lib/rate-limit.ts` | **Nouveau** — limitation de débit en mémoire |
+| `src/lib/supabase/server.ts` | Ajout de `createServiceClient()` |
+| `src/lib/supabase/mock-data.ts` | **Supprimé** |
+| `src/lib/api-articles.ts` | Tous les replis sur les mocks retirés |
+| `src/lib/actions/analytics.ts` | Passe par le client de service + quota |
+| `src/lib/actions/public.ts` | Quotas + vérification que l'article est publié |
+| `src/lib/actions/admin.ts` | Validation des images par octets de signature |
+| `src/lib/utils.ts` | Ajout de `jsonLd()` (échappement `<`, `>`, `&`) |
+| `src/app/layout.tsx` | Retrait de `robots: { index: true }` |
+| `supabase_schema.sql` | §9 vidé de ses fausses données, catégories conservées |
+| `supabase_patch_securite.sql` | **Nouveau** — à exécuter dans Supabase |
+| `package.json` | `next` 16.2.12 → **16.3.0** (3 CVE `high` closes) |
+
+⚠️ **Collision constatée** : `site-config.ts` avait été réécrit entre ma lecture
+et mon édition, introduisant un repli sur `VERCEL_URL` qui envoyait toutes les
+balises canoniques et tout le sitemap vers `*.vercel.app` au lieu du domaine
+acheté. Le garde-fou anti-`localhost` avait par ailleurs disparu au passage. Les
+deux points sont corrigés — merci de ne pas réintroduire de repli automatique sur
+une URL fournie par la plateforme.
+
+Vérifications finales : `npm run lint` → 0 erreur, `npx tsc --noEmit` → 0 erreur,
+`npm run build` → 19 pages générées, `npm audit` → 0 vulnérabilité.
