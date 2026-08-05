@@ -524,7 +524,34 @@ CREATE POLICY "images_delete_admin"
 -- ============================================================================
 
 -- ============================================================================
--- 9. DONNÉES DE DÉMONSTRATION
+-- 9. DONNÉES DE DÉMONSTRATION — SUPPRIMÉES LE 5 AOÛT 2026
+-- ============================================================================
+--
+-- Cette section insérait 3 articles et 3 commentaires fictifs.
+--
+-- Elle a été retirée à la mise en ligne du site, pour deux raisons constatées
+-- pendant l'audit :
+--
+--   1. Les 3 commentaires (« Thomas Dubois », « Léa Martin », « Alexandre », en
+--      @example.com) étaient bel et bien EN PRODUCTION, et en double : le script
+--      ayant été exécuté deux fois, le `ON CONFLICT DO NOTHING` n'a rien
+--      dédoublonné faute de contrainte d'unicité. Six faux commentaires
+--      s'affichaient donc sous les articles d'un média qui revendique des
+--      sources primaires. Ils ont été purgés, et `supabase_patch_securite.sql`
+--      ajoute l'index d'unicité qui manquait.
+--
+--   2. Les 3 articles de démonstration écrasaient le risque inverse : rejouer ce
+--      script sur la base de production aurait pu réintroduire des versions
+--      courtes et périmées des vrais articles.
+--
+-- Les CATÉGORIES sont conservées ci-dessous : ce ne sont pas des données de
+-- démonstration mais la taxonomie réelle du site, dont dépendent les routes
+-- /categories/*. Leur ON CONFLICT DO UPDATE les maintient à jour sans rien
+-- détruire.
+--
+-- Le contenu éditorial, lui, se crée exclusivement depuis le panel
+-- d'administration, qui déclenche `revalidatePath` — une écriture SQL directe
+-- resterait invisible jusqu'au prochain déploiement.
 -- ============================================================================
 
 INSERT INTO public.categories (id, name, slug, description, color) VALUES
@@ -538,138 +565,3 @@ SET name        = EXCLUDED.name,
     slug        = EXCLUDED.slug,
     description = EXCLUDED.description,
     color       = EXCLUDED.color;
-
-INSERT INTO public.articles (id, title, slug, excerpt, content, featured_image, category_id, status, views, published_at) VALUES
-(
-    'a1111111-1111-1111-1111-111111111111',
-    'C''est quoi un LLM ? Comprendre les modèles de langage simplement',
-    'c-est-quoi-un-llm-comprendre-les-modeles-de-langage-simplement',
-    'Découvrez les principes fondamentaux des Large Language Models (LLM) sans jargon mathématique : des fenêtres de contexte aux mécanismes d''attention.',
-    'Les **Large Language Models (LLM)** ou *grands modèles de langage* ont transformé l''interaction entre l''humain et la machine. Mais que se passe-t-il réellement sous le capot lorsque vous envoyez une requête à un modèle ?
-
-## La prédiction du prochain token : le cœur du moteur
-
-À la base, un LLM ne « pense » pas au sens humain du terme. Il s''agit d''un moteur d''inférence statistique entraîné sur un corpus massif de textes. Son objectif est simple : **prédire le token le plus probable suivant une séquence donnée**.
-
-Un *token* correspond environ à 4 caractères, soit 0,75 mot en français. La phrase `"Le chat dort sur le fauteuil"` est découpée en plusieurs jetons numériques que le réseau de neurones traite en parallèle.
-
-### L''architecture Transformer et le mécanisme d''attention
-
-Introduite en 2017 avec le papier fondateur *Attention Is All You Need*, l''architecture **Transformer** est le pilier de tous les LLM modernes.
-
-Le concept clé est l''**auto-attention** (*self-attention*) :
-- Le modèle attribue une importance variable à chaque mot par rapport aux autres.
-- Les dépendances à longue distance dans une phrase sont enfin correctement gérées.
-- La compréhension contextuelle devient fine : le modèle distingue le `"vol"` d''un oiseau du `"vol"` d''une voiture.
-
-## Fenêtre de contexte et mémoire de travail
-
-La fenêtre de contexte représente la quantité maximale de texte qu''un modèle peut garder en mémoire pendant une conversation.
-
-1. **8k à 32k tokens** : la norme pour les tâches quotidiennes et l''assistance conversationnelle.
-2. **128k à 2M+ tokens** : les fenêtres géantes, capables d''ingérer des livres entiers, des bases de code complètes ou des heures d''audio en une seule fois.
-
-## Pourquoi les LLM hallucinent-ils ?
-
-Parce qu''ils fonctionnent par génération probabiliste, il leur arrive d''inventer des faits plausibles mais faux, avec un aplomb déconcertant. C''est ce qu''on appelle une **hallucination**. Deux techniques la limitent :
-- **RAG** (*Retrieval-Augmented Generation*) : connecter le modèle à une base de connaissances externe vérifiée.
-- **RLHF** (*Reinforcement Learning from Human Feedback*) : affiner les réponses par évaluation humaine.
-
-## En résumé
-
-Les LLM sont des amplificateurs intellectuels d''une puissance inédite. En comprenant leur nature probabiliste, vous apprenez à formuler de meilleurs prompts — et à valider leurs résultats avec l''esprit critique qui s''impose.',
-    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-    'c1111111-1111-1111-1111-111111111111',
-    'published',
-    0,
-    NOW() - INTERVAL '3 days'
-),
-(
-    'a2222222-2222-2222-2222-222222222222',
-    'Comparatif des modèles IA 2026 : lequel choisir selon vos besoins ?',
-    'comparatif-modeles-ia-2026-lequel-choisir-selon-vos-besoins',
-    'Un comparatif objectif des leaders du marché : raisonnement, code, rédaction française, tarification et confidentialité des données.',
-    'Le paysage des modèles de fondation évolue à une vitesse fulgurante. Entre les géants américains et les pépites européennes, lequel utiliser au quotidien ? Voici notre lecture indépendante.
-
-## Les prétendants
-
-- **OpenAI** : la référence polyvalente, portée par un écosystème très mature.
-- **Anthropic (Claude)** : le champion du code, de l''écriture naturelle et du respect strict des consignes.
-- **Google (Gemini)** : la multimodalité native et les plus grandes fenêtres de contexte du marché.
-- **Mistral AI** : le fleuron européen, souverain et redoutable en langue française.
-
-## Tableau comparatif
-
-| Critère | Claude | GPT | Gemini | Mistral |
-|---|---|---|---|---|
-| **Rédaction FR** | Excellente | Très bonne | Bonne | Excellente |
-| **Génération de code** | Excellente | Très solide | Correcte | Très solide |
-| **Raisonnement complexe** | Exceptionnel | Exceptionnel | Bon | Bon |
-| **Multimodalité** | Vision | Texte, audio, vision | Texte, audio, vidéo | Vision |
-
-## Recommandations d''usage
-
-### Pour les développeurs
-La précision du code généré, la compréhension des dépendances d''un projet complexe et l''absence de verbosité inutile sont les critères qui font la différence au quotidien.
-
-### Pour l''analyse de documents et de vidéo
-La capacité à ingérer des heures de vidéo ou des dizaines de PDF en une seule requête devient le facteur décisif.
-
-### Pour la confidentialité et l''ancrage européen
-Des modèles performants, hébergés en Europe, conformes au RGPD, sans sacrifier les résultats aux benchmarks.
-
-## Conclusion
-
-Il n''existe plus un « meilleur » modèle universel, mais des spécialistes selon vos cas d''usage. La bonne stratégie consiste souvent à en combiner plusieurs via leurs API respectives.',
-    'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
-    'c2222222-2222-2222-2222-222222222222',
-    'published',
-    0,
-    NOW() - INTERVAL '1 day'
-),
-(
-    'a3333333-3333-3333-3333-333333333333',
-    'Bien rédiger un prompt : le guide complet du débutant à l''expert',
-    'bien-rediger-un-prompt-le-guide-complet-du-debutant-a-l-expert',
-    'Maîtrisez le prompt engineering avec une méthode en 5 piliers : rôle, contexte, objectif, format de sortie et contraintes.',
-    'Obtenir une réponse médiocre d''un LLM est rarement la faute du modèle : c''est presque toujours un problème de structuration du prompt.
-
-## La structure d''un prompt professionnel
-
-1. **Rôle** — définissez la posture de l''IA.
-   *« Agis en tant qu''expert en cybersécurité senior. »*
-2. **Contexte** — expliquez la situation et l''enjeu.
-3. **Objectif** — la tâche exacte à accomplir.
-4. **Format** — la forme attendue de la réponse.
-5. **Contraintes** — ce que le modèle doit absolument éviter.
-
-## Technique avancée : le few-shot prompting
-
-Plutôt que de décrire ce que vous voulez, montrez-le : donnez une à trois paires entrée/sortie directement dans le prompt.
-
-```markdown
-Entrée : "Erreur 404 sur la route /api/users"
-Sortie : [API] Ressource non trouvée. Vérifier l''URL et les paramètres.
-```
-
-Cette technique améliore nettement le taux de réussite sur les tâches complexes.
-
-## Les pièges à éviter
-
-- **Les consignes négatives** : ne dites pas *« ne fais pas X »*, préférez *« fais uniquement Y »*. Les modèles gèrent mal la négation isolée.
-- **Les demandes vagues** : *« rédige un super article »* produira un texte générique. Donnez des directives chiffrées.
-
-Appliquez cette grille dès aujourd''hui : la différence de précision est immédiate.',
-    'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=1200&q=80',
-    'c3333333-3333-3333-3333-333333333333',
-    'published',
-    0,
-    NOW() - INTERVAL '5 hours'
-)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.comments (article_id, author_name, author_email, content, status) VALUES
-('a1111111-1111-1111-1111-111111111111', 'Thomas Dubois', 'thomas@example.com', 'Explication limpide sur l''auto-attention ! C''est la première fois que je saisis vraiment la différence entre tokens et mots.', 'approved'),
-('a1111111-1111-1111-1111-111111111111', 'Léa Martin',    'lea@example.com',    'Très bon article. Prévoyez-vous un sujet dédié au RAG et aux bases vectorielles prochainement ?', 'approved'),
-('a2222222-2222-2222-2222-222222222222', 'Alexandre',     'alex@example.com',   'Je confirme pour Claude sur le code, c''est devenu mon outil de développement principal. Beau travail de synthèse !', 'approved')
-ON CONFLICT DO NOTHING;

@@ -1,24 +1,20 @@
 import { createPublicClient } from './supabase/server';
-import { MOCK_ARTICLES, MOCK_CATEGORIES, MOCK_COMMENTS } from './supabase/mock-data';
 import { Article, Category, CommentPublic } from './types';
 
 /**
  * Couche de lecture publique.
  *
- * RÈGLE DE FALLBACK (corrigée) : les données de démonstration ne servent que
- * lorsque Supabase n'est PAS configuré — c'est-à-dire en développement local
- * sans fichier .env. Dès que Supabase répond, sa réponse fait autorité, y
- * compris lorsqu'elle est vide.
+ * AUCUNE DONNÉE DE REPLI. Supabase fait autorité, y compris lorsqu'il répond
+ * vide, et l'absence de configuration ne produit jamais de contenu inventé.
  *
- * La version précédente basculait sur les mocks dès que `data.length === 0`.
- * Conséquence : une recherche sans résultat, ou une catégorie encore vide,
- * affichait les trois articles fictifs au lieu d'un message « aucun résultat »
- * — et un article supprimé restait accessible indéfiniment via son ancien slug.
+ * Cette règle a été durcie lors de l'audit du 5 août 2026, le site étant
+ * désormais en ligne. Le module `supabase/mock-data.ts` fournissait auparavant
+ * trois articles de démonstration dès que les variables d'environnement
+ * manquaient : une variable oubliée sur Vercel aurait suffi à publier, sans la
+ * moindre erreur visible, un contenu obsolète (« Claude 3.5 », « GPT-4o ») et
+ * un chiffre non sourcé — soit exactement ce que la ligne éditoriale interdit.
+ * Un site vide se remarque et se corrige ; un site faussement plein, non.
  */
-
-const SUPABASE_CONFIGURED = Boolean(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 /** Estimation du temps de lecture : environ 1000 caractères par minute. */
 function readingTime(content: string | null | undefined): number {
@@ -31,11 +27,9 @@ function escapeFilterValue(value: string): string {
 }
 
 export async function getCategories(): Promise<Category[]> {
-  if (!SUPABASE_CONFIGURED) return MOCK_CATEGORIES;
-
   try {
     const supabase = createPublicClient();
-    if (!supabase) return MOCK_CATEGORIES;
+    if (!supabase) return [];
 
     const { data, error } = await supabase.from('categories').select('*').order('name');
 
@@ -80,14 +74,10 @@ export async function getArticles(
   const categorySlug = options.categorySlug?.trim();
   const statusFilter = options.status ?? 'published';
 
-  if (!SUPABASE_CONFIGURED) {
-    return filterMockArticles({ queryStr, categorySlug, statusFilter, page, limit });
-  }
-
   try {
     const supabase = createPublicClient();
     if (!supabase) {
-      return filterMockArticles({ queryStr, categorySlug, statusFilter, page, limit });
+      return { articles: [], total: 0, page, totalPages: 1 };
     }
 
     let req = supabase
@@ -157,13 +147,9 @@ export async function getArticles(
 export async function getArticleBySlug(slug: string): Promise<Article | null> {
   if (!slug) return null;
 
-  if (!SUPABASE_CONFIGURED) {
-    return MOCK_ARTICLES.find((a) => a.slug === slug) ?? null;
-  }
-
   try {
     const supabase = createPublicClient();
-    if (!supabase) return MOCK_ARTICLES.find((a) => a.slug === slug) ?? null;
+    if (!supabase) return null;
 
     // maybeSingle() plutôt que single() : « aucune ligne » est un cas nominal
     // (404), pas une erreur à consigner.
@@ -196,13 +182,9 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
  * et ne retourne que les commentaires validés par la modération.
  */
 export async function getCommentsByArticle(articleId: string): Promise<CommentPublic[]> {
-  if (!SUPABASE_CONFIGURED) {
-    return MOCK_COMMENTS.filter((c) => c.article_id === articleId);
-  }
-
   try {
     const supabase = createPublicClient();
-    if (!supabase) return MOCK_COMMENTS.filter((c) => c.article_id === articleId);
+    if (!supabase) return [];
 
     const { data, error } = await supabase
       .from('comments_public')
@@ -220,47 +202,4 @@ export async function getCommentsByArticle(articleId: string): Promise<CommentPu
     console.error('[commentaires] exception :', err);
     return [];
   }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Filtrage en mémoire — utilisé uniquement hors configuration Supabase        */
-/* -------------------------------------------------------------------------- */
-
-function filterMockArticles(params: {
-  queryStr?: string;
-  categorySlug?: string;
-  statusFilter: 'published' | 'draft' | 'all';
-  page: number;
-  limit: number;
-}): GetArticlesResult {
-  const { queryStr, categorySlug, statusFilter, page, limit } = params;
-
-  let filtered = [...MOCK_ARTICLES];
-
-  if (statusFilter !== 'all') {
-    filtered = filtered.filter((a) => a.status === statusFilter);
-  }
-
-  if (categorySlug) {
-    filtered = filtered.filter((a) => a.category?.slug === categorySlug);
-  }
-
-  if (queryStr) {
-    filtered = filtered.filter(
-      (a) =>
-        a.title.toLowerCase().includes(queryStr) ||
-        a.excerpt.toLowerCase().includes(queryStr) ||
-        a.content.toLowerCase().includes(queryStr)
-    );
-  }
-
-  const total = filtered.length;
-  const start = (page - 1) * limit;
-
-  return {
-    articles: filtered.slice(start, start + limit),
-    total,
-    page,
-    totalPages: Math.max(1, Math.ceil(total / limit)),
-  };
 }
