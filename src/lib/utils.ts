@@ -53,3 +53,24 @@ export function formatNumber(value: number): string {
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
 }
+
+/**
+ * Sérialise un objet destiné à une balise `<script type="application/ld+json">`.
+ *
+ * `JSON.stringify` seul ne suffit PAS dans ce contexte, et c'est un piège
+ * classique : il échappe les guillemets, mais laisse passer `<` et `>` tels
+ * quels. Un titre d'article contenant `</script><script>…` referme donc la
+ * balise et exécute ce qui suit. Le contenu vient ici du back-office, l'attaque
+ * suppose donc un compte rédacteur — mais une faille exploitable par un éditeur
+ * reste une faille, et le correctif tient en une ligne.
+ *
+ * On neutralise `<`, `>` et `&` par leur échappement Unicode : la valeur JSON
+ * décodée reste rigoureusement identique pour les moteurs de recherche, et plus
+ * aucune séquence ne peut être interprétée comme du balisage HTML.
+ */
+export function jsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+}

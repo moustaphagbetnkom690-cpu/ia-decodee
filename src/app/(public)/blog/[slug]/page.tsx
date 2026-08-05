@@ -11,6 +11,7 @@ import { AdBanner } from '@/components/AdBanner';
 import { ViewTracker } from '@/components/ViewTracker';
 import { SITE_PATHS } from '@/lib/site-links';
 import { siteConfig } from '@/lib/site-config';
+import { jsonLd } from '@/lib/utils';
 import { Clock, Eye, Calendar, Share2, ChevronRight } from 'lucide-react';
 
 interface ArticlePageProps {
@@ -151,11 +152,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(jsonLdBreadcrumb) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdArticle) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(jsonLdArticle) }}
       />
 
       {/* BANNIÈRE D'EN-TÊTE ARTICLE */}

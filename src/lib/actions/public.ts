@@ -1,9 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createPublicClient } from '@/lib/supabase/server';
 import { getVisitorGeo } from '@/lib/geo';
 import { isValidEmail } from '@/lib/utils';
+import { limiter } from '@/lib/rate-limit';
 
 /**
  * Actions déclenchées par les visiteurs (non authentifiés).
@@ -39,6 +40,14 @@ export async function subscribeToNewsletter(
 
   if (!isValidEmail(email)) {
     return { ok: false, message: 'Cette adresse e-mail semble invalide.' };
+  }
+
+  // 3 inscriptions par heure et par adresse IP. Personne ne s'inscrit
+  // légitimement quatre fois, et cela suffit à décourager le remplissage
+  // automatisé de la table.
+  const quota = await limiter('newsletter', 3, 3600);
+  if (!quota.autorise) {
+    return { ok: false, message: 'Trop de tentatives. Réessayez dans quelques minutes.' };
   }
 
   const supabase = await createClient();
@@ -91,6 +100,37 @@ export async function submitComment(
   if (!isValidEmail(authorEmail)) return { ok: false, message: 'Cette adresse e-mail semble invalide.' };
   if (content.length < 2) return { ok: false, message: 'Votre commentaire est trop court.' };
   if (content.length > 5000) return { ok: false, message: 'Votre commentaire dépasse 5000 caractères.' };
+
+  // 5 commentaires par quart d'heure. Un lecteur qui répond à plusieurs
+  // paragraphes reste à l'aise ; un script qui boucle est arrêté net.
+  const quota = await limiter('commentaire', 5, 900);
+  if (!quota.autorise) {
+    return {
+      ok: false,
+      message: `Trop de commentaires envoyés. Patientez ${quota.attendreSecondes} secondes.`,
+    };
+  }
+
+  // L'article doit exister ET être publié.
+  //
+  // Sans ce contrôle, la policy RLS acceptait un commentaire sur n'importe quel
+  // UUID d'article valide — y compris un BROUILLON. Un tiers pouvait ainsi
+  // découvrir l'existence d'articles non publiés en sondant des identifiants, et
+  // y déposer des commentaires qui apparaissaient à la publication. La lecture
+  // passe par le client public : la policy `articles_select_published` masque
+  // déjà les brouillons au rôle anonyme, la requête ne renvoie donc rien pour
+  // eux, ce qui produit exactement le refus recherché.
+  const lecteur = createPublicClient();
+  if (lecteur) {
+    const { data: article } = await lecteur
+      .from('articles')
+      .select('id')
+      .eq('id', articleId)
+      .eq('status', 'published')
+      .maybeSingle();
+
+    if (!article) return { ok: false, message: 'Article introuvable.' };
+  }
 
   const supabase = await createClient();
   if (!supabase) {

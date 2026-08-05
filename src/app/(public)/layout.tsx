@@ -1,4 +1,5 @@
 import { siteConfig } from '@/lib/site-config';
+import { jsonLd } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 
@@ -59,11 +60,11 @@ export default function PublicLayout({
 
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(jsonLdOrg) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdWebsite) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(jsonLdWebsite) }}
       />
     </>
   );

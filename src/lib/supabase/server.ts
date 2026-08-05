@@ -67,3 +67,36 @@ export function createPublicClient() {
     },
   });
 }
+
+/**
+ * Client de SERVICE — contourne intégralement la RLS.
+ *
+ * ⚠️ À n'importer QUE depuis un fichier `'use server'` ou un Server Component.
+ * La clé lue ici n'a pas de préfixe NEXT_PUBLIC_ : si ce module venait à être
+ * inclus dans un bundle navigateur, la variable vaudrait `undefined` et la
+ * fonction renverrait null plutôt que d'exposer quoi que ce soit. C'est un
+ * garde-fou, pas une autorisation : ne l'appelez jamais côté client.
+ *
+ * Introduit lors de l'audit du 5 août 2026 pour un seul usage : l'enregistrement
+ * des vues. Le RPC `record_page_view` était accordé au rôle `anon` ET recevait
+ * le pays en paramètre. N'importe qui pouvait donc, avec la seule clé publique
+ * lisible dans le navigateur, injecter un nombre illimité de vues depuis un pays
+ * inventé — ce qui a été vérifié en conditions réelles (3 insertions, HTTP 204).
+ * Le RPC est désormais révoqué pour `anon` et `authenticated` (voir
+ * `supabase_patch_securite.sql`) : seul ce client peut l'appeler, et le pays
+ * provient donc réellement des en-têtes de la plateforme, comme annoncé.
+ */
+export function createServiceClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    return null;
+  }
+
+  return createSupabaseClient(supabaseUrl, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}

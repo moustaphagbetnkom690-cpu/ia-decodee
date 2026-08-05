@@ -29,6 +29,31 @@ export interface ActionResult {
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 Mo
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'];
 
+/**
+ * Vérifie qu'un fichier est bien une image, d'après ses premiers octets.
+ *
+ * `file.type` est une simple déclaration du navigateur : elle se falsifie en
+ * une ligne. Un fichier HTML annoncé comme `image/png` finissait donc dans un
+ * bucket public et était servi depuis le domaine Supabase — de quoi héberger
+ * une page de hameçonnage sous une adresse d'apparence légitime.
+ *
+ * Les signatures (« magic bytes ») sont, elles, dans le contenu du fichier.
+ */
+async function looksLikeImage(file: File): Promise<boolean> {
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const startsWith = (...bytes: number[]) => bytes.every((b, i) => header[i] === b);
+  const ascii = (offset: number, text: string) =>
+    [...text].every((c, i) => header[offset + i] === c.charCodeAt(0));
+
+  return (
+    startsWith(0xff, 0xd8, 0xff) ||                          // JPEG
+    startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a) || // PNG
+    startsWith(0x47, 0x49, 0x46, 0x38) ||                    // GIF87a / GIF89a
+    (ascii(0, 'RIFF') && ascii(8, 'WEBP')) ||                // WebP
+    ascii(4, 'ftyp')                                         // AVIF (conteneur ISO-BMFF)
+  );
+}
+
 function fail(message: string): ActionResult {
   return { ok: false, message };
 }
@@ -170,6 +195,9 @@ export async function uploadImage(
   }
   if (file.size > MAX_IMAGE_BYTES) {
     return fail('Image trop lourde (5 Mo maximum).');
+  }
+  if (!(await looksLikeImage(file))) {
+    return fail('Ce fichier n’est pas une image valide.');
   }
 
   const supabase = await createClient();
