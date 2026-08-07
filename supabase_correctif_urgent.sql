@@ -1,0 +1,56 @@
+-- ============================================================================
+-- CORRECTIF URGENT — À EXÉCUTER IMMÉDIATEMENT
+-- Supabase > SQL Editor. Une seule ligne utile, effet instantané.
+-- ============================================================================
+--
+-- CE QUI S'EST PASSÉ
+--
+-- Le §2 de `supabase_patch_securite.sql` révoquait EXECUTE sur `is_admin()`
+-- pour le rôle `anon`. C'était une erreur d'analyse de ma part.
+--
+-- La policy de lecture des articles s'écrit :
+--
+--     USING (status = 'published' OR public.is_admin())
+--
+-- PostgreSQL exige que le rôle APPELANT dispose du droit EXECUTE sur toute
+-- fonction citée dans une policy — y compris quand la fonction est en
+-- SECURITY DEFINER, et y compris quand le OR pourrait court-circuiter. En
+-- retirant ce droit à `anon`, toute lecture d'article par un visiteur anonyme
+-- échouait avec « permission denied for function is_admin », et le blog
+-- s'affichait vide.
+--
+-- Les catégories continuaient de fonctionner (leur policy est `USING (true)`,
+-- elle n'appelle aucune fonction), ce qui rendait la panne d'autant plus
+-- trompeuse : le site semblait sain, seuls les articles avaient disparu.
+--
+-- POURQUOI RESTAURER CE DROIT NE ROUVRE AUCUNE FAILLE
+--
+-- `is_admin()` ne renvoie jamais que `true` ou `false`. Pour un visiteur
+-- anonyme, `auth.uid()` est NULL, donc la réponse est invariablement `false`.
+-- Aucune donnée ne transite. Le §2 corrigeait un défaut purement cosmétique —
+-- je l'avais d'ailleurs écrit noir sur blanc dans le patch — et ce confort ne
+-- valait évidemment pas de casser la lecture publique du site.
+--
+-- Les correctifs réellement importants du patch (§1 falsification des
+-- statistiques, §3 unicité des commentaires, §4 plafonds) restent en place et
+-- ne sont pas touchés par ce fichier.
+-- ============================================================================
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated;
+
+-- ============================================================================
+-- VÉRIFICATION — les deux requêtes doivent réussir après exécution
+-- ============================================================================
+--
+--   -- 1. Depuis un terminal, avec la CLÉ ANONYME : doit lister vos articles
+--   --    et non plus « permission denied ».
+--   curl "$SUPABASE_URL/rest/v1/articles?select=title&status=eq.published" \
+--        -H "apikey: $CLE_ANON" -H "Authorization: Bearer $CLE_ANON"
+--
+--   -- 2. La falsification des vues doit TOUJOURS être refusée (le §1 tient) :
+--   curl -X POST "$SUPABASE_URL/rest/v1/rpc/record_page_view" \
+--        -H "apikey: $CLE_ANON" -H "Authorization: Bearer $CLE_ANON" \
+--        -H "Content-Type: application/json" \
+--        -d '{"p_path":"/test","p_country_code":"ZZ"}'
+--   -- attendu : 401 « permission denied for function record_page_view »
+-- ============================================================================

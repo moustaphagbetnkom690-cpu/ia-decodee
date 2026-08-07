@@ -65,6 +65,15 @@ export const metadata: Metadata = {
     title: siteConfig.name,
     description: siteConfig.description,
   },
+  // Vérification de propriété Google Search Console.
+  //
+  // Next n'émet la balise que si la valeur est non vide, d'où le spread
+  // conditionnel : une balise `google-site-verification` vide serait ignorée par
+  // Google, mais elle salirait le <head> de toutes les pages pour rien.
+  ...(siteConfig.googleSiteVerification
+    ? { verification: { google: siteConfig.googleSiteVerification } }
+    : {}),
+
   // NOTE : pas de `robots: { index: true }` ici.
   //
   // Le déclarer dans le layout racine l'appliquait à TOUTES les pages, y compris

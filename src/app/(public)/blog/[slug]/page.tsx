@@ -59,13 +59,20 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       type: 'article',
       publishedTime: article.published_at,
       authors: [siteConfig.name],
-      images: article.featured_image ? [{ url: article.featured_image }] : [],
+      // Clé OMISE quand l'article n'a pas d'image à la une — surtout pas `[]`.
+      //
+      // Un tableau vide n'est pas neutre : il ÉCRASE l'image produite par
+      // `opengraph-image.tsx`. Les articles sans visuel se retrouvaient donc
+      // sans aucune balise og:image, c'est-à-dire avec une vignette vide au
+      // partage. En omettant la clé, Next applique la convention de fichier et
+      // génère une image portant le titre de l'article.
+      ...(article.featured_image ? { images: [{ url: article.featured_image }] } : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title: article.title,
       description: article.excerpt,
-      images: article.featured_image ? [article.featured_image] : [],
+      ...(article.featured_image ? { images: [article.featured_image] } : {}),
     },
   };
 }
@@ -125,7 +132,17 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     '@type': 'Article',
     headline: article.title,
     description: article.excerpt,
-    image: article.featured_image || `${siteConfig.url}/images/og-image.jpg`,
+    // Repli sur l'image de partage du SITE, et non sur celle de l'article.
+    //
+    // On ne peut pas construire l'URL de l'image d'un article à la main : sous un
+    // segment dynamique, Next suffixe la route d'un hachage
+    // (`/blog/[slug]/opengraph-image-16v7k9`). Vérifié : l'adresse sans suffixe
+    // renvoie 404. Seule `/opengraph-image`, à la racine, a une URL stable.
+    //
+    // Les balises og:image des réseaux sociaux, elles, sont injectées
+    // automatiquement par Next avec la bonne URL hachée — ce repli ne concerne
+    // que le JSON-LD, où une adresse fiable prime sur une image personnalisée.
+    image: article.featured_image || `${siteConfig.url}/opengraph-image`,
     datePublished: article.published_at,
     dateModified: article.updated_at || article.published_at,
     author: {

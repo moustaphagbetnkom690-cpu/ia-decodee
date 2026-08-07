@@ -38,19 +38,32 @@ DROP POLICY IF EXISTS "page_views_insert_public" ON public.page_views;
 -- normalement, sans qu'aucune policy publique ne soit nécessaire.
 
 -- ============================================================================
--- 2. is_admin() NE DOIT PAS ÊTRE EXÉCUTABLE PAR LE PUBLIC
+-- 2. is_admin() DOIT RESTER EXÉCUTABLE PAR anon  ← NE PAS « CORRIGER »
 -- ============================================================================
 --
--- Le schéma v2 comportait déjà un REVOKE ... FROM PUBLIC, mais il restait sans
--- effet pour `anon` : PostgreSQL accorde EXECUTE à PUBLIC par défaut à la
--- création, et un GRANT ultérieur au rôle `authenticated` ne retire rien à
--- `anon`. Vérifié pendant l'audit : l'appel réussissait et renvoyait `false`.
+-- Une version antérieure de ce patch révoquait EXECUTE sur `is_admin()` pour
+-- `anon`, au motif qu'une fonction d'autorisation n'a rien à faire dans la
+-- surface publique. C'ÉTAIT UNE ERREUR, et elle a cassé la production.
 --
--- Aucune donnée ne fuit (la réponse est toujours `false` pour un anonyme), mais
--- une fonction d'autorisation n'a rien à faire dans la surface publique.
+-- La policy de lecture des articles s'écrit :
+--
+--     USING (status = 'published' OR public.is_admin())
+--
+-- PostgreSQL exige que le rôle APPELANT possède le droit EXECUTE sur toute
+-- fonction citée dans une policy — même en SECURITY DEFINER, et même lorsque le
+-- OR pourrait court-circuiter. Sans ce droit, toute lecture d'article par un
+-- visiteur anonyme échoue avec « permission denied for function is_admin » : le
+-- blog s'affiche entièrement vide.
+--
+-- La panne est particulièrement trompeuse : les catégories continuent de
+-- s'afficher, leur policy étant `USING (true)` sans appel de fonction. Le site
+-- paraît sain, seuls les articles ont disparu.
+--
+-- Le droit est donc accordé explicitement, et il doit le rester. Cela n'ouvre
+-- aucune faille : `is_admin()` ne renvoie que `true` ou `false`, et pour un
+-- anonyme `auth.uid()` vaut NULL, donc la réponse est toujours `false`.
 
-REVOKE EXECUTE ON FUNCTION public.is_admin() FROM anon, PUBLIC;
-GRANT  EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated;
 
 -- ============================================================================
 -- 3. GARDE-FOU CONTRE LES COMMENTAIRES EN DOUBLE

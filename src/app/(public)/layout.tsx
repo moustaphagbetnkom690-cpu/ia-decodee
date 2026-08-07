@@ -24,7 +24,9 @@ export default function PublicLayout({
     '@type': 'Organization',
     name: siteConfig.name,
     url: siteConfig.url,
-    logo: `${siteConfig.url}/logo.png`,
+    // /logo.png n'a jamais existé : Google recevait un logo en 404 dans les
+    // données structurées. Remplacé par un SVG réellement présent dans public/.
+    logo: `${siteConfig.url}/logo.svg`,
     description: siteConfig.description,
   };
 

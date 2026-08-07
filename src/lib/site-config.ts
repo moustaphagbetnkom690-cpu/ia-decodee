@@ -73,7 +73,13 @@ export const siteConfig = {
   tagline: "Le média francophone qui décode l'Intelligence Artificielle",
   description: "Guides pratiques, comparatifs de modèles (GPT, Claude, Gemini, Mistral), actualités et analyses d'outils IA pour les professionnels et passionnés.",
   url: siteUrl,
-  ogImage: "/images/og-image.jpg",
+  // L'image de partage n'est plus un fichier : elle est générée par
+  // src/app/opengraph-image.tsx et Next injecte lui-même les balises og:image.
+  // L'ancien chemin /images/og-image.jpg n'a jamais existé (404 en production).
+
+  // Code de vérification Google Search Console. Sans lui, le sitemap ne peut
+  // pas être soumis et aucune donnée de référencement n'est visible.
+  googleSiteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
   adsenseClientId: process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || "",
   gaId: process.env.NEXT_PUBLIC_GA_ID || "",
   author: {
