@@ -79,7 +79,20 @@ export const siteConfig = {
 
   // Code de vérification Google Search Console. Sans lui, le sitemap ne peut
   // pas être soumis et aucune donnée de référencement n'est visible.
-  googleSiteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+  //
+  // La valeur est écrite en clair, et ce n'est pas une négligence : ce jeton est
+  // destiné à être publié dans le <head> de chaque page — c'est très exactement
+  // ainsi que Google vérifie la propriété du domaine. Il ne donne aucun accès :
+  // le connaître ne permet ni de lire vos données Search Console, ni de
+  // revendiquer le site, puisqu'il faut par ailleurs le servir depuis ce domaine.
+  // Le coder ici évite une variable d'environnement de plus, et surtout évite que
+  // la vérification tombe le jour où quelqu'un nettoie les variables Vercel.
+  //
+  // La variable d'environnement reste prioritaire, pour pouvoir vérifier un
+  // environnement de préproduction sans toucher au code.
+  googleSiteVerification:
+    process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
+    "bZnxuW7towuW1rqp4MjJuuCcNeWJIFrbGlo2CJUD0Lg",
   adsenseClientId: process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || "",
   gaId: process.env.NEXT_PUBLIC_GA_ID || "",
   author: {
