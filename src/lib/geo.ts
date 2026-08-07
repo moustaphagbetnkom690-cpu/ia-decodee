@@ -17,32 +17,15 @@ export interface VisitorGeo {
   city: string | null;
 }
 
-/** Convertit un code ISO 3166-1 alpha-2 en drapeau emoji (FR → 🇫🇷). */
-export function countryFlag(code: string | null | undefined): string {
-  if (!code || code.length !== 2 || !/^[A-Za-z]{2}$/.test(code)) return '🏳️';
-  const base = 0x1f1e6; // Indicateur régional « A »
-  return String.fromCodePoint(
-    ...code
-      .toUpperCase()
-      .split('')
-      .map((char) => base + char.charCodeAt(0) - 65)
-  );
-}
-
-/**
- * Nom du pays en français à partir de son code ISO.
- * Intl.DisplayNames couvre l'intégralité des pays, ce qui évite d'entretenir à
- * la main une table de correspondance forcément incomplète.
- */
-export function countryName(code: string | null | undefined): string {
-  if (!code) return 'Inconnu';
-  try {
-    const display = new Intl.DisplayNames(['fr'], { type: 'region' });
-    return display.of(code.toUpperCase()) ?? code.toUpperCase();
-  } catch {
-    return code.toUpperCase();
-  }
-}
+// countryFlag() et countryName() vivent désormais dans `country.ts` : elles sont
+// purement calculatoires, et les garder ici entraînait `next/headers` dans le
+// paquet navigateur dès qu'un composant client importait le drapeau d'un pays.
+// La réexportation évite de toucher aux appelants serveur existants.
+// L'import sert à getVisitorGeo() ci-dessous ; la réexportation sert aux
+// appelants historiques. Un simple `export ... from` ne mettrait pas le nom
+// dans la portée locale de ce fichier.
+import { countryName } from './country';
+export { countryFlag, countryName } from './country';
 
 /** Décode les en-têtes de ville, encodés en ASCII par Vercel (« Le%20Mans »). */
 function decodeHeader(value: string | null): string | null {

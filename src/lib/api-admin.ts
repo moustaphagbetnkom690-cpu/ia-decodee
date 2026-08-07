@@ -243,6 +243,89 @@ export async function getNewsletterSubscribers(): Promise<NewsletterSubscriber[]
   return (data ?? []) as NewsletterSubscriber[];
 }
 
+/* -------------------------------------------------------------------------- */
+/* TEMPS RÉEL                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export interface RealtimePage {
+  path: string;
+  visiteurs: number;
+  vues: number;
+  pays: string[];
+}
+
+export interface RealtimeCountry {
+  code: string;
+  nom: string;
+  visiteurs: number;
+}
+
+export interface RealtimeActivity {
+  visiteurs: number;
+  vues: number;
+  fenetreMinutes: number;
+  derniereVisite: string | null;
+  pages: RealtimePage[];
+  pays: RealtimeCountry[];
+  /** Vrai si la migration temps réel n'a pas encore été appliquée en base. */
+  indisponible?: boolean;
+}
+
+const ACTIVITE_VIDE: RealtimeActivity = {
+  visiteurs: 0,
+  vues: 0,
+  fenetreMinutes: 5,
+  derniereVisite: null,
+  pages: [],
+  pays: [],
+};
+
+/**
+ * Activité du site sur les dernières minutes.
+ *
+ * Le décompte porte sur des visiteurs DISTINCTS, pas sur des chargements : deux
+ * rechargements d'un même lecteur comptent pour un. Voir `empreinteVisiteur()`
+ * dans `actions/analytics.ts` pour la construction de l'identifiant, et
+ * `supabase_patch_temps_reel.sql` pour la garantie de non-réversibilité.
+ *
+ * Toute l'agrégation a lieu dans la base : cette fonction est appelée toutes les
+ * quinze secondes par le back-office, il serait absurde de rapatrier les lignes
+ * brutes pour les compter côté serveur Next.
+ */
+export async function getRealtimeActivity(minutes = 5): Promise<RealtimeActivity> {
+  await requireAdmin();
+
+  const supabase = await createClient();
+  if (!supabase) return ACTIVITE_VIDE;
+
+  const { data, error } = await supabase.rpc('analytics_temps_reel', {
+    p_minutes: minutes,
+  });
+
+  if (error) {
+    // 42883 = fonction inexistante, PGRST202 = absente du cache PostgREST.
+    // Le patch SQL n'a pas encore été exécuté : on le signale à l'interface
+    // plutôt que d'afficher un zéro trompeur, indiscernable d'un site sans
+    // visiteur.
+    if (error.code === '42883' || error.code === 'PGRST202') {
+      return { ...ACTIVITE_VIDE, indisponible: true };
+    }
+    console.error('[analytics/temps-reel] :', error.message);
+    return ACTIVITE_VIDE;
+  }
+
+  const brut = (data ?? {}) as Record<string, unknown>;
+
+  return {
+    visiteurs: Number(brut.visiteurs ?? 0),
+    vues: Number(brut.vues ?? 0),
+    fenetreMinutes: Number(brut.fenetre_minutes ?? minutes),
+    derniereVisite: (brut.derniere_visite as string | null) ?? null,
+    pages: (brut.pages as RealtimePage[]) ?? [],
+    pays: (brut.pays as RealtimeCountry[]) ?? [],
+  };
+}
+
 /** Répartition géographique de l'audience (RPC agrégée côté base). */
 export async function getViewsByCountry(days = 30): Promise<CountryStat[]> {
   await requireAdmin();

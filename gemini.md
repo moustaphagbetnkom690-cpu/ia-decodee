@@ -218,3 +218,34 @@ une URL fournie par la plateforme.
 
 Vérifications finales : `npm run lint` → 0 erreur, `npx tsc --noEmit` → 0 erreur,
 `npm run build` → 19 pages générées, `npm audit` → 0 vulnérabilité.
+
+## Journal des synchronisations — 7 août 2026 (Claude)
+
+**Référencement finalisé + compteur de visiteurs en temps réel.**
+
+| Fichier | Changement |
+|---|---|
+| `src/app/opengraph-image.tsx` | **Nouveau** — image de partage du site, générée par code |
+| `src/app/(public)/blog/[slug]/opengraph-image.tsx` | **Nouveau** — image par article |
+| `public/logo.svg` | **Nouveau** — remplace `/logo.png` qui renvoyait 404 |
+| `src/lib/country.ts` | **Nouveau** — `countryFlag`/`countryName` extraits de `geo.ts` |
+| `src/lib/rate-limit.ts` | limitation de débit (5 août) |
+| `src/components/admin/LiveVisitors.tsx` | **Nouveau** — visiteurs en ligne |
+| `src/lib/actions/realtime.ts` | **Nouveau** — pont server action |
+| `src/lib/api-admin.ts` | `getRealtimeActivity()` |
+| `src/lib/actions/analytics.ts` | empreinte de visiteur (SHA-256 quotidien) |
+| `src/app/admin/page.tsx` | bandeau temps réel compact |
+| `src/app/admin/audience/page.tsx` | panneau temps réel détaillé |
+| `.../politique-de-confidentialite/page.tsx` | section « Mesure d'audience » |
+| `supabase_patch_temps_reel.sql` | **Nouveau — à exécuter dans Supabase** |
+
+⚠️ **Deux pièges rencontrés, à ne pas réintroduire :**
+
+1. **`geo.ts` ne doit pas être importé depuis un composant client.** Il dépend de
+   `next/headers`, réservé au serveur. Le build échoue avec *« You're importing a
+   module that depends on next/headers »*. Les fonctions purement calculatoires
+   vivent désormais dans `country.ts` ; `geo.ts` les réexporte.
+
+2. **Ne pas appeler une fonction qui fait `setState` directement dans le corps
+   d'un `useEffect`** — `react-hooks/set-state-in-effect` le refuse en erreur
+   (rendus en cascade). Différer d'un `setTimeout(fn, 0)`.

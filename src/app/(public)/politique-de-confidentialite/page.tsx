@@ -28,7 +28,31 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-lg font-bold text-ink">2. Cookies et Google AdSense</h2>
+          <h2 className="text-lg font-bold text-ink">2. Mesure d&apos;audience</h2>
+          <p>
+            Nous mesurons la fréquentation du site <strong>sans déposer aucun cookie</strong> et
+            sans recourir à un service tiers. À chaque page consultée, nous enregistrons la page
+            visitée, le pays d&apos;origine de la connexion, la page de provenance et le type de
+            navigateur.
+          </p>
+          <p>
+            <strong>Votre adresse IP n&apos;est jamais conservée.</strong> Pour distinguer deux
+            visiteurs d&apos;un même visiteur qui recharge une page, nous calculons une empreinte
+            technique à partir de votre adresse IP, de votre navigateur et de la date du jour. Cette
+            empreinte est chiffrée à sens unique : elle ne permet pas de remonter à votre adresse
+            IP, ni de vous identifier. Elle <strong>change chaque jour</strong>, ce qui rend
+            impossible tout suivi d&apos;une journée sur l&apos;autre, y compris de notre part. Elle
+            est effacée au bout de vingt-quatre heures.
+          </p>
+          <p>
+            Cette méthode est celle des outils de mesure respectueux de la vie privée. Elle nous
+            permet de savoir combien de personnes lisent nos articles, sans jamais constituer de
+            profil individuel.
+          </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-lg font-bold text-ink">3. Cookies et Google AdSense</h2>
           <p>
             Nous utilisons des tiers, notamment <strong>Google AdSense</strong>, pour diffuser des annonces lorsque vous visitez notre site Web. Ces sociétés peuvent utiliser des informations sur vos visites sur ce site et d&apos;autres sites Web afin de fournir des publicités sur des biens et services qui vous intéressent.
           </p>
@@ -38,7 +62,7 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-lg font-bold text-ink">3. Vos Droits (RGPD)</h2>
+          <h2 className="text-lg font-bold text-ink">4. Vos Droits (RGPD)</h2>
           <p>
             Conformément au Règlement Général sur la Protection des Données (RGPD), vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement et d&apos;opposition concernant vos données personnelles. Vous pouvez exercer ce droit à tout moment via notre formulaire de contact.
           </p>

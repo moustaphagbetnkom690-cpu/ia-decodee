@@ -6,6 +6,7 @@ import { countryFlag } from '@/lib/geo';
 import { SITE_PATHS } from '@/lib/site-links';
 import { formatNumber, cn } from '@/lib/utils';
 import { StatCard } from '@/components/admin/StatCard';
+import { LiveVisitors } from '@/components/admin/LiveVisitors';
 
 const RANGES = [
   { days: 7, label: '7 jours' },
@@ -66,6 +67,10 @@ export default async function AdminAudiencePage({ searchParams }: AudiencePagePr
           ))}
         </nav>
       </header>
+
+      {/* TEMPS RÉEL — qui lit quoi, maintenant. Les blocs suivants agrègent sur
+          plusieurs jours ; celui-ci répond à une autre question. */}
+      <LiveVisitors variante="detaille" />
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard

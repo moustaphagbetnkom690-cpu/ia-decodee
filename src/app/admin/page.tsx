@@ -19,6 +19,7 @@ import {
 } from '@/lib/api-admin';
 import { SITE_PATHS } from '@/lib/site-links';
 import { StatCard } from '@/components/admin/StatCard';
+import { LiveVisitors } from '@/components/admin/LiveVisitors';
 import { countryFlag } from '@/lib/geo';
 import { formatNumber } from '@/lib/utils';
 
@@ -79,6 +80,10 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
       )}
+
+      {/* TEMPS RÉEL — placé avant les compteurs cumulés : c'est l'information
+          qu'on vient chercher en arrivant sur le tableau de bord. */}
+      <LiveVisitors variante="compact" />
 
       {/* STATISTIQUES */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
