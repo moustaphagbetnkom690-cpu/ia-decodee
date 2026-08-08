@@ -21,11 +21,55 @@ export function slugify(input: string): string {
     .slice(0, 200);
 }
 
+/**
+ * Fuseau de référence du site.
+ *
+ * Toutes les dates de publication sont saisies, stockées et affichées en heure
+ * de Paris. Sans ce choix explicite, `toLocaleString` suivrait le fuseau de la
+ * machine : un article programmé pour 14 h 30 s'afficherait « 12:30 » une fois
+ * rendu sur Vercel, dont les fonctions tournent en UTC. La base, elle, conserve
+ * bien un instant absolu (TIMESTAMPTZ) — seule la présentation est localisée.
+ */
+const FUSEAU_SITE = 'Europe/Paris';
+
+/**
+ * Décalage, en millisecondes, entre l'heure de Paris et UTC à un instant donné.
+ * Calculé via Intl plutôt que codé en dur : il vaut +1 h en hiver, +2 h en été.
+ */
+function decalageSite(instant: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: FUSEAU_SITE,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant);
+
+  const champ = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+
+  const commeUTC = Date.UTC(
+    champ('year'),
+    champ('month') - 1,
+    champ('day'),
+    // Intl rend « 24 » pour minuit avec hour12:false ; Date.UTC l'accepte, mais
+    // le modulo évite de basculer d'un jour dans les comparaisons.
+    champ('hour') % 24,
+    champ('minute'),
+    champ('second')
+  );
+
+  return commeUTC - instant.getTime();
+}
+
 /** Formate une date en français : « 3 août 2026 ». */
 export function formatDate(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('fr-FR', {
+    timeZone: FUSEAU_SITE,
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -37,11 +81,73 @@ export function formatDateTime(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('fr-FR', {
+    timeZone: FUSEAU_SITE,
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/**
+ * « 2026-08-10T14:30 » (heure de Paris) → instant ISO en UTC.
+ * C'est la conversion attendue par la valeur d'un `<input type="datetime-local">`.
+ * Renvoie null si la chaîne n'a pas la forme attendue.
+ */
+export function siteLocalToISO(local: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim());
+  if (!m) return null;
+
+  const [, annee, mois, jour, heure, minute] = m;
+  const naif = Date.UTC(+annee, +mois - 1, +jour, +heure, +minute);
+
+  // Deux passes : le décalage dépend de l'instant, qu'on ne connaît qu'après
+  // l'avoir appliqué. La première approximation suffit à déterminer le bon
+  // régime horaire, sauf exactement pendant l'heure escamotée du changement
+  // d'heure — où toute réponse est également défendable.
+  const approx = naif - decalageSite(new Date(naif));
+  const exact = naif - decalageSite(new Date(approx));
+
+  const date = new Date(exact);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/**
+ * Instant ISO → « 2026-08-10T14:30 » en heure de Paris, prêt à alimenter un
+ * `<input type="datetime-local">`.
+ */
+export function isoToSiteLocal(value: string | Date | null | undefined): string {
+  if (!value) return '';
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() + decalageSite(date)).toISOString().slice(0, 16);
+}
+
+/** Formate une date avec l'heure de Paris : « 10 août 2026 à 14:30 ». */
+export function formatDateHeure(value: string | Date): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '—';
+
+  const jour = date.toLocaleDateString('fr-FR', {
+    timeZone: FUSEAU_SITE,
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const heure = date.toLocaleTimeString('fr-FR', {
+    timeZone: FUSEAU_SITE,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  return `${jour} à ${heure}`;
+}
+
+/** Vrai si l'instant est encore à venir — donc si la publication est programmée. */
+export function estDansLeFutur(value: string | Date | null | undefined): boolean {
+  if (!value) return false;
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return !Number.isNaN(date.getTime()) && date.getTime() > Date.now();
 }
 
 /** Sépare les milliers à la française : 12 480. */

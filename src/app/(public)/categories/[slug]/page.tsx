@@ -16,6 +16,9 @@ interface CategoryPageProps {
   }>;
 }
 
+/** Revalidation ISR : voir la note dans `blog/[slug]/page.tsx`. */
+export const revalidate = 60;
+
 /** Pré-génère une page par catégorie au moment du build. */
 export async function generateStaticParams() {
   const categories = await getCategories();

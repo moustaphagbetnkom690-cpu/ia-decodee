@@ -2,6 +2,11 @@ import { MetadataRoute } from 'next';
 import { getArticles, getCategories } from '@/lib/api-articles';
 import { siteConfig } from '@/lib/site-config';
 
+/* Le plan de site ne doit pas annoncer un article encore programmé : Google
+   suivrait l'URL et n'y trouverait rien. `getArticles` l'écarte déjà, encore
+   faut-il que ce fichier soit régénéré à l'échéance — d'où la revalidation. */
+export const revalidate = 60;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [{ articles }, categories] = await Promise.all([
     getArticles({ limit: 100 }),

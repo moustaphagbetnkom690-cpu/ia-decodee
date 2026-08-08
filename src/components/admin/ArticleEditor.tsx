@@ -1,6 +1,13 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
@@ -16,18 +23,48 @@ import {
   CheckCircle2,
   Loader2,
   ImageIcon,
+  CalendarClock,
+  Clock3,
 } from 'lucide-react';
 import { saveArticle, deleteArticle, uploadImage, type ActionResult } from '@/lib/actions/admin';
-import { slugify, cn } from '@/lib/utils';
+import { slugify, cn, isoToSiteLocal, formatDateHeure, siteLocalToISO } from '@/lib/utils';
 import { SITE_PATHS } from '@/lib/site-links';
 import type { Article, Category } from '@/lib/types';
+
+/**
+ * Horloge, exposée à React comme la source externe qu'elle est.
+ *
+ * L'heure courante ne peut pas être lue pendant le rendu : elle donnerait une
+ * valeur au rendu serveur et une autre à l'hydratation. `useSyncExternalStore`
+ * règle les deux problèmes d'un coup — l'instantané serveur vaut `null`, et
+ * l'abonnement fait disparaître de lui-même l'encart « programmé » lorsque
+ * l'heure de parution finit par arriver, sans toucher au formulaire.
+ */
+const PAS_HORLOGE = 30_000;
+
+function souscrireHorloge(onChange: () => void): () => void {
+  const id = setInterval(onChange, PAS_HORLOGE);
+  return () => clearInterval(id);
+}
+
+/* Arrondi au pas : l'instantané doit être identique d'un appel à l'autre tant
+   que rien n'a changé, sans quoi React boucle indéfiniment. */
+function instantaneHorloge(): number {
+  return Math.floor(Date.now() / PAS_HORLOGE) * PAS_HORLOGE;
+}
+
+function instantaneServeur(): null {
+  return null;
+}
 
 interface ArticleEditorProps {
   article?: Article | null;
   categories: Category[];
+  /** Instant ISO proposé par défaut à la création. Calculé côté serveur. */
+  defaultPublishedAt?: string;
 }
 
-export function ArticleEditor({ article, categories }: ArticleEditorProps) {
+export function ArticleEditor({ article, categories, defaultPublishedAt }: ArticleEditorProps) {
   const router = useRouter();
   const isEditing = Boolean(article);
 
@@ -46,6 +83,34 @@ export function ArticleEditor({ article, categories }: ArticleEditorProps) {
   const [categoryId, setCategoryId] = useState(article?.category_id ?? categories[0]?.id ?? '');
   const [status, setStatus] = useState(article?.status ?? 'draft');
   const [featuredImage, setFeaturedImage] = useState(article?.featured_image ?? '');
+
+  /* Date et heure de publication, au format d'un `<input type="datetime-local">`
+     et exprimées en heure de Paris — le fuseau de référence du site, imposé
+     pour que la valeur saisie soit celle affichée en ligne, où que se trouve le
+     rédacteur. Un nouvel article est proposé « maintenant ». */
+  const [publishedAt, setPublishedAt] = useState(() =>
+    isoToSiteLocal(article?.published_at ?? defaultPublishedAt)
+  );
+
+  /* Instant de référence, `null` tant que la page n'est pas hydratée. */
+  const maintenant = useSyncExternalStore(
+    souscrireHorloge,
+    instantaneHorloge,
+    instantaneServeur
+  );
+
+  /* « Programmé » se déduit de la saisie, pas d'un statut supplémentaire en
+     base : un article publié dont l'heure est à venir est, par définition, un
+     article programmé. Le calcul repasse par siteLocalToISO pour interpréter la
+     saisie dans le fuseau du site plutôt que dans celui du navigateur. */
+  const publishedAtISO = publishedAt ? siteLocalToISO(publishedAt) : null;
+  const parutionProgrammee =
+    publishedAtISO &&
+    maintenant !== null &&
+    status === 'published' &&
+    new Date(publishedAtISO).getTime() > maintenant
+      ? formatDateHeure(publishedAtISO)
+      : null;
 
   const [showPreview, setShowPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -312,6 +377,40 @@ export function ArticleEditor({ article, categories }: ArticleEditorProps) {
                 <option value="draft">Brouillon — invisible du public</option>
                 <option value="published">Publié — visible en ligne</option>
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="published_at" className="field-label">
+                Date et heure de publication
+              </label>
+              <div className="relative">
+                <input
+                  id="published_at"
+                  name="published_at"
+                  type="datetime-local"
+                  required
+                  value={publishedAt}
+                  onChange={(event) => setPublishedAt(event.target.value)}
+                  className="field pl-9 font-mono text-xs"
+                />
+                <CalendarClock className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-faint" />
+              </div>
+
+              {parutionProgrammee ? (
+                <p className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-warning/30 bg-warning/10 p-2 text-[11px] leading-relaxed text-warning">
+                  <Clock3 className="mt-px h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Publication programmée. L’article reste invisible du public — et
+                    absent du plan de site — jusqu’au{' '}
+                    <strong className="font-semibold">{parutionProgrammee}</strong>, puis
+                    paraît de lui-même dans la minute qui suit.
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-1.5 font-mono text-[11px] text-faint">
+                  Heure de Paris. Une date future programme la parution.
+                </p>
+              )}
             </div>
 
             <div>

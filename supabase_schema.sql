@@ -412,9 +412,15 @@ CREATE POLICY "profiles_write_admin"
 -- --- Articles ---------------------------------------------------------------
 -- Les brouillons ne sont lisibles que des admins : un visiteur anonyme ne peut
 -- pas consulter un article non publié, même en tapant son slug directement.
+-- La condition sur published_at porte la programmation des parutions : un
+-- article publié mais daté du futur reste invisible jusqu'à son heure. Voir
+-- `supabase_patch_programmation.sql` pour le détail.
 CREATE POLICY "articles_select_published"
     ON public.articles FOR SELECT
-    USING (status = 'published' OR public.is_admin());
+    USING (
+        (status = 'published' AND published_at <= NOW())
+        OR public.is_admin()
+    );
 
 CREATE POLICY "articles_write_admin"
     ON public.articles FOR ALL

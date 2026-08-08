@@ -249,3 +249,41 @@ Vérifications finales : `npm run lint` → 0 erreur, `npx tsc --noEmit` → 0 e
 2. **Ne pas appeler une fonction qui fait `setState` directement dans le corps
    d'un `useEffect`** — `react-hooks/set-state-in-effect` le refuse en erreur
    (rendus en cascade). Différer d'un `setTimeout(fn, 0)`.
+
+---
+
+## Journal des synchronisations — 8 août 2026 (Claude)
+
+**Programmation des parutions (date + heure) et correction de la publication des
+commentaires approuvés.**
+
+| Fichier | Changement |
+|---|---|
+| `src/lib/utils.ts` | `FUSEAU_SITE`, `siteLocalToISO`, `isoToSiteLocal`, `formatDateHeure`, `estDansLeFutur` ; `formatDate`/`formatDateTime` forcés en heure de Paris |
+| `src/lib/api-articles.ts` | Filtre `published_at <= now` sur les listes publiques et dans `getArticleBySlug` |
+| `src/lib/actions/admin.ts` | `published_at` enregistré depuis le formulaire ; `revalidateArticlePage()` ; revalidation de l'ancien slug après renommage |
+| `src/components/admin/ArticleEditor.tsx` | Champ `datetime-local` + encart « publication programmée » |
+| `src/app/admin/articles/page.tsx` | Colonne « Publication », statut « Programmé », décompte dans l'en-tête |
+| `src/app/admin/articles/nouveau/page.tsx` | Passe `defaultPublishedAt` calculé côté serveur |
+| `src/components/ArticleCard.tsx`, `blog/[slug]/page.tsx` | Affichent la date **et l'heure** |
+| `blog/[slug]`, `categories/[slug]`, `sitemap.ts` | `export const revalidate = 60` |
+| `supabase_patch_programmation.sql` | **Nouveau — à exécuter dans Supabase** |
+| `supabase_schema.sql` | Policy `articles_select_published` alignée |
+
+⚠️ **Trois pièges rencontrés, à ne pas réintroduire :**
+
+1. **`revalidatePath('/blog', 'layout')` n'atteint pas `/blog/<slug>`.** La forme
+   `'layout'` invalide les pages sous un layout — encore faut-il qu'un
+   `layout.tsx` existe à ce segment. Il n'y en a pas sous `blog/`. C'était la
+   cause du bug « le commentaire approuvé n'apparaît pas sur l'article » :
+   utiliser l'URL littérale.
+
+2. **Ne jamais interpréter la valeur d'un `datetime-local` avec `new Date()`.**
+   La chaîne n'a pas de fuseau ; elle serait lue dans celui du serveur (UTC sur
+   Vercel), décalant chaque heure de publication. Passer par `siteLocalToISO()`.
+
+3. **`Date.now()` est interdit pendant le rendu** — `react-hooks/purity` le
+   refuse en erreur, et cela produirait une divergence d'hydratation. Le
+   correctif retenu ici n'est PAS le `setState` dans un effet (refusé lui aussi,
+   cf. journal du 7 août) mais `useSyncExternalStore`, avec un instantané
+   serveur à `null` et un instantané client arrondi pour rester stable.

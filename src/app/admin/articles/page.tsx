@@ -1,14 +1,18 @@
 import Link from 'next/link';
-import { Plus, Eye, Pencil, CheckCircle2, Clock, FileText } from 'lucide-react';
+import { Plus, Eye, Pencil, CheckCircle2, Clock, FileText, CalendarClock } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { getAdminArticles } from '@/lib/api-admin';
 import { toggleArticleStatus } from '@/lib/actions/admin';
 import { SITE_PATHS } from '@/lib/site-links';
-import { formatDateTime, formatNumber } from '@/lib/utils';
+import { formatDateTime, formatNumber, estDansLeFutur } from '@/lib/utils';
 
 export default async function AdminArticlesPage() {
   await requireAdmin();
   const articles = await getAdminArticles();
+
+  const programmes = articles.filter(
+    (article) => article.status === 'published' && estDansLeFutur(article.published_at)
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -17,7 +21,16 @@ export default async function AdminArticlesPage() {
           <span className="eyebrow mb-2">Catalogue</span>
           <h1 className="text-2xl font-bold text-ink">Articles</h1>
           <p className="mt-1 text-sm text-muted">
-            {articles.length} article{articles.length > 1 ? 's' : ''} au total.
+            {articles.length} article{articles.length > 1 ? 's' : ''} au total
+            {programmes > 0 && (
+              <>
+                {' — dont '}
+                <span className="text-warning">
+                  {programmes} programmé{programmes > 1 ? 's' : ''}
+                </span>
+              </>
+            )}
+            .
           </p>
         </div>
 
@@ -41,19 +54,26 @@ export default async function AdminArticlesPage() {
           {/* Le tableau défile horizontalement dans son propre conteneur plutôt
               que de faire déborder la page entière sur petit écran. */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+            <table className="w-full min-w-[900px] border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-line bg-surface font-mono text-muted">
                   <th scope="col" className="p-4">Titre</th>
                   <th scope="col" className="p-4">Catégorie</th>
                   <th scope="col" className="p-4">Statut</th>
                   <th scope="col" className="p-4 text-right">Vues</th>
+                  <th scope="col" className="p-4">Publication</th>
                   <th scope="col" className="p-4">Modifié</th>
                   <th scope="col" className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {articles.map((article) => (
+                {articles.map((article) => {
+                  /* « Programmé » n'est pas un statut stocké : c'est un article
+                     publié dont l'heure de parution n'est pas encore venue. */
+                  const programme =
+                    article.status === 'published' && estDansLeFutur(article.published_at);
+
+                  return (
                   <tr key={article.id} className="transition-colors hover:bg-elevated/50">
                     <td className="max-w-xs p-4">
                       <Link
@@ -96,12 +116,18 @@ export default async function AdminArticlesPage() {
                           type="submit"
                           title="Cliquer pour changer le statut"
                           className={
-                            article.status === 'published'
-                              ? 'flex items-center gap-1 font-mono text-lime hover:underline'
-                              : 'flex items-center gap-1 font-mono text-muted hover:underline'
+                            programme
+                              ? 'flex items-center gap-1 font-mono text-warning hover:underline'
+                              : article.status === 'published'
+                                ? 'flex items-center gap-1 font-mono text-lime hover:underline'
+                                : 'flex items-center gap-1 font-mono text-muted hover:underline'
                           }
                         >
-                          {article.status === 'published' ? (
+                          {programme ? (
+                            <>
+                              <CalendarClock className="h-3.5 w-3.5" /> Programmé
+                            </>
+                          ) : article.status === 'published' ? (
                             <>
                               <CheckCircle2 className="h-3.5 w-3.5" /> Publié
                             </>
@@ -118,7 +144,17 @@ export default async function AdminArticlesPage() {
                       {formatNumber(article.views)}
                     </td>
 
-                    <td className="p-4 font-mono text-[11px] text-faint">
+                    <td
+                      className={
+                        programme
+                          ? 'whitespace-nowrap p-4 font-mono text-[11px] text-warning'
+                          : 'whitespace-nowrap p-4 font-mono text-[11px] text-muted'
+                      }
+                    >
+                      {formatDateTime(article.published_at)}
+                    </td>
+
+                    <td className="whitespace-nowrap p-4 font-mono text-[11px] text-faint">
                       {formatDateTime(article.updated_at)}
                     </td>
 
@@ -143,7 +179,8 @@ export default async function AdminArticlesPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

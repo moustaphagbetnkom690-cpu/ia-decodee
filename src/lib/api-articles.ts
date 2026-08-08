@@ -21,6 +21,21 @@ function readingTime(content: string | null | undefined): number {
   return Math.max(2, Math.ceil((content?.length ?? 0) / 1000));
 }
 
+/**
+ * Un article n'est public que s'il est publié ET que son heure de publication
+ * est passée.
+ *
+ * Ce filtre est appliqué ici, dans le code, ET par la policy RLS
+ * `articles_select_published` (voir `supabase_patch_programmation.sql`). La
+ * redondance est délibérée : le site tourne aujourd'hui sur une base où le
+ * patch n'a pas encore été exécuté, et un article programmé ne doit pas fuiter
+ * en attendant. Inversement, la policy protège l'API PostgREST, joignable avec
+ * la seule clé publique sans passer par ce module.
+ */
+function maintenantISO(): string {
+  return new Date().toISOString();
+}
+
 /** Neutralise les caractères ayant une signification dans un filtre PostgREST. */
 function escapeFilterValue(value: string): string {
   return value.replace(/[%,()\\]/g, ' ').trim();
@@ -86,6 +101,13 @@ export async function getArticles(
 
     if (statusFilter !== 'all') {
       req = req.eq('status', statusFilter);
+    }
+
+    // Les articles programmés restent invisibles jusqu'à leur heure. Le filtre
+    // ne s'applique qu'aux listes publiques : le back-office demande
+    // explicitement 'all' ou 'draft' et doit, lui, voir ce qui est à venir.
+    if (statusFilter === 'published') {
+      req = req.lte('published_at', maintenantISO());
     }
 
     if (categorySlug) {
@@ -165,6 +187,15 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
     }
 
     if (!data) return null;
+
+    // Même règle que pour les listes : un article programmé se comporte, vu du
+    // public, exactement comme un article inexistant → notFound().
+    // La comparaison passe par Date : PostgREST rend « …+00:00 » là où
+    // toISOString() rend « …Z », deux écritures du même instant qu'une
+    // comparaison de chaînes classerait à tort.
+    if (data.status !== 'published' || new Date(data.published_at).getTime() > Date.now()) {
+      return null;
+    }
 
     return {
       ...data,

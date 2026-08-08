@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Article } from '@/lib/types';
 import { SITE_PATHS } from '@/lib/site-links';
+import { formatDateHeure } from '@/lib/utils';
 import { Clock, Eye, Calendar, ArrowUpRight } from 'lucide-react';
 
 export interface ArticleCardProps {
@@ -15,11 +16,11 @@ export function ArticleCard({ article, featured = false }: ArticleCardProps) {
   const categoryName = article.category?.name || 'Modèles';
   const categoryColor = article.category?.color || '#7C5CFF';
 
-  const publishedDate = new Date(article.published_at).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  /* Date ET heure, en heure de Paris. Le formatage passe par l'utilitaire
+     partagé plutôt que par un toLocaleDateString local : rendu sur Vercel,
+     celui-ci suivait le fuseau UTC de la fonction serverless et décalait
+     l'affichage de deux heures en été. */
+  const publishedDate = formatDateHeure(article.published_at);
 
   if (featured) {
     return (

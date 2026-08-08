@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
-import { slugify } from '@/lib/utils';
+import { slugify, siteLocalToISO, formatDateHeure } from '@/lib/utils';
 import { SITE_PATHS } from '@/lib/site-links';
 
 /**
@@ -68,6 +68,37 @@ function revalidateArticleSurfaces(slug?: string) {
   if (slug) revalidatePath(`/blog/${slug}`);
 }
 
+/**
+ * Purge le cache de la page publique d'un article, à partir de son identifiant.
+ *
+ * `revalidatePath('/blog', 'layout')` ne suffisait PAS, et c'est la cause du
+ * bug « j'approuve un commentaire, il n'apparaît pas sur l'article ».
+ *
+ * La forme 'layout' invalide bien le layout visé ET toutes les pages en
+ * dessous — à condition qu'un `layout.tsx` existe à ce segment. Or il n'y en a
+ * pas sous `blog/` : le seul layout du site public est celui du groupe
+ * `(public)`, qui répond au chemin `/`. L'appel désignait donc un segment sans
+ * fichier de layout, et les pages d'articles déjà générées restaient servies
+ * telles quelles, commentaire approuvé ou non.
+ *
+ * La documentation est explicite : « Use a literal path when you want to
+ * refresh a single page. » D'où la lecture du slug avant de revalider.
+ */
+async function revalidateArticlePage(
+  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
+  articleId: string | null | undefined
+): Promise<void> {
+  if (!articleId) return;
+
+  const { data } = await supabase
+    .from('articles')
+    .select('slug')
+    .eq('id', articleId)
+    .maybeSingle();
+
+  if (data?.slug) revalidatePath(`/blog/${data.slug}`);
+}
+
 /* -------------------------------------------------------------------------- */
 /* ARTICLES                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -89,10 +120,21 @@ export async function saveArticle(
   const categoryId = ((formData.get('category_id') as string) ?? '').trim() || null;
   const featuredImage = ((formData.get('featured_image') as string) ?? '').trim() || null;
   const status = (formData.get('status') as string) === 'draft' ? 'draft' : 'published';
+  const rawPublishedAt = ((formData.get('published_at') as string) ?? '').trim();
 
   if (title.length < 3) return fail('Le titre doit contenir au moins 3 caractères.');
   if (excerpt.length < 10) return fail('L’extrait doit contenir au moins 10 caractères.');
   if (content.length < 50) return fail('Le contenu doit contenir au moins 50 caractères.');
+
+  /* Le champ arrive au format d'un `<input type="datetime-local">`, c'est-à-dire
+     sans fuseau : « 2026-08-10T14:30 ». Il est interprété en heure de Paris —
+     et surtout PAS avec `new Date(...)`, qui l'interpréterait dans le fuseau de
+     la machine, soit UTC sur Vercel : chaque enregistrement aurait décalé
+     l'heure de publication de deux heures. */
+  const publishedAt = rawPublishedAt ? siteLocalToISO(rawPublishedAt) : new Date().toISOString();
+  if (!publishedAt) {
+    return fail('Date de publication invalide.');
+  }
 
   const slug = slugify(rawSlug || title);
   if (!slug) return fail('Impossible de générer un slug à partir de ce titre.');
@@ -117,30 +159,43 @@ export async function saveArticle(
     featured_image: featuredImage,
     category_id: categoryId,
     status,
+    published_at: publishedAt,
   };
 
+  const programme = status === 'published' && new Date(publishedAt).getTime() > Date.now();
+  const confirmation = (verbe: string) =>
+    programme
+      ? `Article ${verbe} et programmé pour le ${formatDateHeure(publishedAt)}.`
+      : `Article ${verbe}.`;
+
   if (id) {
+    /* Le slug précédent doit être revalidé lui aussi : s'il a changé, l'ancienne
+       URL resterait servie depuis le cache avec l'ancien contenu. */
+    const { data: avant } = await supabase
+      .from('articles')
+      .select('slug')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await supabase.from('articles').update(payload).eq('id', id);
     if (error) return fail(`Échec de la mise à jour : ${error.message}`);
 
     revalidateArticleSurfaces(slug);
-    return { ok: true, message: 'Article mis à jour.', articleId: id };
+    if (avant?.slug && avant.slug !== slug) revalidateArticleSurfaces(avant.slug);
+
+    return { ok: true, message: confirmation('mis à jour'), articleId: id };
   }
 
   const { data, error } = await supabase
     .from('articles')
-    .insert({
-      ...payload,
-      author_id: session.userId,
-      published_at: new Date().toISOString(),
-    })
+    .insert({ ...payload, author_id: session.userId })
     .select('id')
     .single();
 
   if (error) return fail(`Échec de la création : ${error.message}`);
 
   revalidateArticleSurfaces(slug);
-  return { ok: true, message: 'Article créé.', articleId: data.id };
+  return { ok: true, message: confirmation('créé'), articleId: data.id };
 }
 
 export async function deleteArticle(formData: FormData): Promise<void> {
@@ -152,8 +207,14 @@ export async function deleteArticle(formData: FormData): Promise<void> {
   const supabase = await createClient();
   if (!supabase) return;
 
+  const { data: article } = await supabase
+    .from('articles')
+    .select('slug')
+    .eq('id', id)
+    .maybeSingle();
+
   await supabase.from('articles').delete().eq('id', id);
-  revalidateArticleSurfaces();
+  revalidateArticleSurfaces(article?.slug);
   redirect(SITE_PATHS.adminArticles);
 }
 
@@ -168,10 +229,18 @@ export async function toggleArticleStatus(formData: FormData): Promise<void> {
   const supabase = await createClient();
   if (!supabase) return;
 
+  const { data: article } = await supabase
+    .from('articles')
+    .select('slug')
+    .eq('id', id)
+    .maybeSingle();
+
   const next = current === 'published' ? 'draft' : 'published';
   await supabase.from('articles').update({ status: next }).eq('id', id);
 
-  revalidateArticleSurfaces();
+  // La page de l'article doit être revalidée nommément : elle passe de « 200 »
+  // à « introuvable » (ou l'inverse), et le cache ne s'en aperçoit pas seul.
+  revalidateArticleSurfaces(article?.slug);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -293,12 +362,19 @@ export async function moderateComment(formData: FormData): Promise<void> {
   const supabase = await createClient();
   if (!supabase) return;
 
+  // L'article est relu AVANT la mise à jour : c'est lui dont la page devra être
+  // régénérée, que le commentaire y apparaisse ou en disparaisse.
+  const { data: comment } = await supabase
+    .from('comments')
+    .select('article_id')
+    .eq('id', id)
+    .maybeSingle();
+
   await supabase.from('comments').update({ status }).eq('id', id);
 
   revalidatePath('/admin/commentaires');
   revalidatePath('/admin');
-  // Le commentaire apparaît ou disparaît de l'article public selon la décision.
-  revalidatePath('/blog', 'layout');
+  await revalidateArticlePage(supabase, comment?.article_id);
 }
 
 export async function deleteComment(formData: FormData): Promise<void> {
@@ -310,10 +386,19 @@ export async function deleteComment(formData: FormData): Promise<void> {
   const supabase = await createClient();
   if (!supabase) return;
 
+  // Même raison que dans moderateComment : après DELETE, l'article associé
+  // n'est plus lisible depuis le commentaire.
+  const { data: comment } = await supabase
+    .from('comments')
+    .select('article_id')
+    .eq('id', id)
+    .maybeSingle();
+
   await supabase.from('comments').delete().eq('id', id);
 
   revalidatePath('/admin/commentaires');
-  revalidatePath('/blog', 'layout');
+  revalidatePath('/admin');
+  await revalidateArticlePage(supabase, comment?.article_id);
 }
 
 /* -------------------------------------------------------------------------- */

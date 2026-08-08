@@ -59,6 +59,29 @@ actions appellent `revalidatePath` — c'est ce qui rend la publication immédia
 (vérifié en production locale : liste, page, accueil et sitemap mis à jour sans
 rebuild).
 
+**Les parutions se programment à la date ET à l'heure**, en heure de Paris —
+`FUSEAU_SITE` dans `src/lib/utils.ts`. Il n'existe pas de statut « programmé » :
+un article est programmé lorsqu'il est *publié* et que son `published_at` est à
+venir. Le filtre est appliqué deux fois, dans `api-articles.ts` et dans la
+policy RLS, et retirer l'une des deux couches rouvre une fuite (voir l'en-tête
+de `supabase_patch_programmation.sql`).
+
+Ne jamais convertir la saisie avec `new Date('2026-08-10T14:30')` : sans fuseau,
+la chaîne est lue dans celui de la machine — UTC sur Vercel — et l'heure part
+avec deux heures d'écart. Passer par `siteLocalToISO()`.
+
+**La parution automatique repose sur la revalidation ISR à 60 s** des pages
+publiques et du plan de site. À l'échéance, l'article paraît de lui-même dans la
+minute. Retirer un `export const revalidate` d'une de ces pages fige la
+programmation pour cette surface, en silence.
+
+**Une page sous segment dynamique se revalide par son URL littérale.**
+`revalidatePath('/blog', 'layout')` ne l'atteint pas : il n'y a aucun
+`layout.tsx` sous `blog/`, le seul layout public étant celui du groupe
+`(public)`. C'était la cause du bug « le commentaire approuvé n'apparaît pas sur
+l'article » — les actions de modération lisent maintenant le slug avant de
+revalider `/blog/<slug>`.
+
 **Le compteur de vues compte les chargements de page**, pas les visiteurs
 uniques. Un rechargement = +1. Aucune empreinte de session n'est posée.
 
@@ -98,7 +121,12 @@ Ils font la valeur du site — les préserver.
 
 ## Ce qui reste à faire
 
-**Trois actions manuelles, à faire dans cet ordre — le site est en ligne.**
+**Quatre actions manuelles, à faire dans cet ordre — le site est en ligne.**
+
+0. **Exécuter `supabase_patch_programmation.sql`.** Sans lui, la programmation
+   des parutions tient uniquement au filtre applicatif : un article programmé
+   reste invisible sur le site, mais l'API PostgREST le sert à qui interroge la
+   base directement avec la clé publique.
 
 1. **Exécuter `supabase_patch_securite.sql`** dans Supabase > SQL Editor. Tant
    que ce n'est pas fait, n'importe qui peut injecter de fausses vues depuis un

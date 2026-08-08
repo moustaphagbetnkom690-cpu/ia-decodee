@@ -11,7 +11,7 @@ import { AdBanner } from '@/components/AdBanner';
 import { ViewTracker } from '@/components/ViewTracker';
 import { SITE_PATHS } from '@/lib/site-links';
 import { siteConfig } from '@/lib/site-config';
-import { jsonLd } from '@/lib/utils';
+import { jsonLd, formatDateHeure } from '@/lib/utils';
 import { Clock, Eye, Calendar, Share2, ChevronRight } from 'lucide-react';
 
 interface ArticlePageProps {
@@ -19,6 +19,18 @@ interface ArticlePageProps {
     slug: string;
   }>;
 }
+
+/**
+ * Revalidation ISR toutes les 60 secondes.
+ *
+ * C'est ce qui fait paraître un article programmé sans intervention : à
+ * l'échéance, la première demande sert encore la page en cache, puis la
+ * régénère en arrière-plan avec le nouvel état. Sans cela, une page rendue
+ * « introuvable » avant l'heure le resterait jusqu'au prochain déploiement.
+ * Les modifications faites depuis le panel restent immédiates : les server
+ * actions appellent `revalidatePath` et n'attendent pas ce délai.
+ */
+export const revalidate = 60;
 
 /**
  * Pré-génère les pages des articles publiés au moment du build.
@@ -96,11 +108,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const categorySlug = article.category?.slug || 'modeles';
   const categoryColor = article.category?.color || '#7C5CFF';
 
-  const publishedDate = new Date(article.published_at).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const publishedDate = formatDateHeure(article.published_at);
 
   const jsonLdBreadcrumb = {
     '@context': 'https://schema.org',
@@ -212,7 +220,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-accent" />
-                {publishedDate}
+                <time dateTime={article.published_at}>{publishedDate}</time>
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-lime" />
