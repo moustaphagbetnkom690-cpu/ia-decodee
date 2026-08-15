@@ -156,9 +156,18 @@ d'un moteur de recherche : 28 referrers internes, 1 localhost. Les vues « US »
 portent des user-agents de robots (`Nexus 5 Build/MRA58N`). `site:ia-decodee.tech`
 ne renvoie rien.
 
-**Le sitemap ne déclarait que 3 articles sur 12** — figé au dernier build, faute
-de `revalidate` ; `revalidatePath('/sitemap.xml')` ne le rafraîchit pas. Neuf
-articles n'ont jamais été soumis à Google. Corrigé.
+**Le sitemap ne déclarait que 3 articles sur 12** — figé au dernier build. Neuf
+articles n'ont jamais été soumis à Google.
+
+⚠️ **Ne jamais remettre le plan de site en cache.** Deux mécanismes ont été
+essayés et mesurés en production, tous deux insuffisants :
+`revalidatePath('/sitemap.xml')` ne le rafraîchit pas, et `export const
+revalidate = 60` non plus — la route restait servie en `X-Vercel-Cache: HIT`
+avec un `Age` bien supérieur à la fenêtre, sans jamais se régénérer. Seul
+`export const dynamic = 'force-dynamic'` donne un plan de site juste. Le coût
+est nul : seuls des robots demandent cette route. Le flux RSS, lui, garde son
+ISR — c'est un Route Handler, il fixe ses propres en-têtes et se régénère
+correctement (vérifié).
 
 **Le nom de marque est occupé.** « IA Décodée » est la série éditoriale d'NVIDIA
 (*AI Decoded*), une émission spéciale de Radio-Canada et un cours UNESCO. Le
