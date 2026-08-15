@@ -106,3 +106,19 @@ export const siteConfig = {
     linkedin: "https://linkedin.com",
   },
 };
+
+/**
+ * Déclaration du flux RSS, à replacer dans CHAQUE page qui définit son propre
+ * `alternates`.
+ *
+ * Next fusionne les métadonnées champ par champ : une page qui déclare
+ * `alternates: { canonical }` remplace l'objet `alternates` du layout racine en
+ * entier, et perd donc le lien vers le flux. Constaté sur les pages d'articles,
+ * précisément celles qu'un lecteur régulier consulte. D'où cette constante
+ * partagée, à étaler à côté du canonical.
+ */
+export const RSS_ALTERNATE_TYPES = {
+  "application/rss+xml": [
+    { url: "/feed.xml", title: `${siteConfig.name} — flux RSS` },
+  ],
+};

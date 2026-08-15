@@ -7,7 +7,7 @@ import { ArticleCard } from '@/components/ArticleCard';
 import { Sidebar } from '@/components/Sidebar';
 import { AdBanner } from '@/components/AdBanner';
 import { SITE_PATHS } from '@/lib/site-links';
-import { siteConfig } from '@/lib/site-config';
+import { siteConfig, RSS_ALTERNATE_TYPES } from '@/lib/site-config';
 import { Tag, ChevronRight } from 'lucide-react';
 
 interface CategoryPageProps {
@@ -38,6 +38,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     description: category.description || `Retrouvez les meilleurs articles et guides dans la catégorie ${category.name}.`,
     alternates: {
       canonical: `${siteConfig.url}/categories/${category.slug}`,
+      types: RSS_ALTERNATE_TYPES,
     },
   };
 }

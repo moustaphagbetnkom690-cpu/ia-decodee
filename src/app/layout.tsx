@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
-import { siteConfig } from '@/lib/site-config';
+import { siteConfig, RSS_ALTERNATE_TYPES } from '@/lib/site-config';
 
 /* Polices auto-hébergées via next/font. Elles étaient auparavant chargées par un
    <link> vers Google Fonts placé dans le <head>, ce qui bloquait le rendu et
@@ -48,6 +48,10 @@ export const metadata: Metadata = {
   authors: [{ name: siteConfig.author.name }],
   creator: siteConfig.name,
   publisher: siteConfig.name,
+  // Déclaration du flux RSS. C'est ce `<link rel="alternate">` que cherchent les
+  // agrégateurs et les extensions de lecture : sans lui, le flux existe à son
+  // adresse mais personne ne le trouve.
+  alternates: { types: RSS_ALTERNATE_TYPES },
   // NOTE : plus aucun `alternates.canonical` ici. Le déclarer dans le layout
   // racine appliquait l'URL d'accueil comme canonical à TOUTES les pages, ce qui
   // revenait à dire à Google que chaque article était un doublon de la page

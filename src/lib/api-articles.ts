@@ -208,6 +208,73 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
 }
 
 /**
+ * Articles à lire ensuite, pour le maillage interne.
+ *
+ * ── Pourquoi cette fonction existe ───────────────────────────────────────────
+ * L'audit du 14 août 2026 a relevé 4 liens internes par page d'article, tous
+ * issus de la barre latérale. Aucun lien contextuel entre deux articles : du
+ * point de vue d'un moteur de recherche, chaque article était une île, et
+ * l'importance d'une page se mesure d'abord au nombre de liens internes qui la
+ * désignent.
+ *
+ * ── La règle de sélection ────────────────────────────────────────────────────
+ * On privilégie la même catégorie — c'est ce qui construit une grappe
+ * thématique, où un article pilier et ses satellites se renforcent — puis on
+ * complète avec les plus récents si la catégorie est trop peu fournie. Sans ce
+ * complément, un article seul dans sa catégorie n'aurait aucun lien sortant,
+ * soit exactement le cas qu'on cherche à supprimer.
+ */
+export async function getRelatedArticles(
+  article: Pick<Article, 'id' | 'category_id'>,
+  limit = 4
+): Promise<Article[]> {
+  try {
+    const supabase = createPublicClient();
+    if (!supabase) return [];
+
+    const select = '*, category:categories(*), author:profiles(*)';
+
+    const memeCategorie = article.category_id
+      ? await supabase
+          .from('articles')
+          .select(select)
+          .eq('status', 'published')
+          .lte('published_at', maintenantISO())
+          .eq('category_id', article.category_id)
+          .neq('id', article.id)
+          .order('published_at', { ascending: false })
+          .limit(limit)
+      : { data: [] };
+
+    const retenus = (memeCategorie.data ?? []) as Article[];
+
+    if (retenus.length < limit) {
+      const dejaPris = [article.id, ...retenus.map((a) => a.id)];
+
+      const { data: recents } = await supabase
+        .from('articles')
+        .select(select)
+        .eq('status', 'published')
+        .lte('published_at', maintenantISO())
+        // PostgREST attend la syntaxe « (a,b,c) » pour l'exclusion multiple.
+        .not('id', 'in', `(${dejaPris.join(',')})`)
+        .order('published_at', { ascending: false })
+        .limit(limit - retenus.length);
+
+      retenus.push(...((recents ?? []) as Article[]));
+    }
+
+    return retenus.map((item) => ({
+      ...item,
+      reading_time_minutes: readingTime(item.content),
+    }));
+  } catch (err) {
+    console.error('[articles liés] exception :', err);
+    return [];
+  }
+}
+
+/**
  * Commentaires publics d'un article.
  * Lit exclusivement la vue `comments_public`, qui n'expose jamais author_email
  * et ne retourne que les commentaires validés par la modération.

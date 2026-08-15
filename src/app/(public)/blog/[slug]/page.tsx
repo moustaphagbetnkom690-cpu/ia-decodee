@@ -4,13 +4,19 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getArticleBySlug, getCommentsByArticle, getArticles } from '@/lib/api-articles';
+import {
+  getArticleBySlug,
+  getCommentsByArticle,
+  getArticles,
+  getRelatedArticles,
+} from '@/lib/api-articles';
 import { CommentSection } from '@/components/CommentSection';
+import { RelatedArticles } from '@/components/RelatedArticles';
 import { Sidebar } from '@/components/Sidebar';
 import { AdBanner } from '@/components/AdBanner';
 import { ViewTracker } from '@/components/ViewTracker';
 import { SITE_PATHS } from '@/lib/site-links';
-import { siteConfig } from '@/lib/site-config';
+import { siteConfig, RSS_ALTERNATE_TYPES } from '@/lib/site-config';
 import { jsonLd, formatDateHeure } from '@/lib/utils';
 import { Clock, Eye, Calendar, Share2, ChevronRight } from 'lucide-react';
 
@@ -63,6 +69,9 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     description: article.excerpt,
     alternates: {
       canonical: canonicalUrl,
+      // Sans ce rappel, la page perdrait le lien vers le flux déclaré par le
+      // layout racine — voir RSS_ALTERNATE_TYPES.
+      types: RSS_ALTERNATE_TYPES,
     },
     openGraph: {
       // OpenGraph n'est pas soumis au gabarit : le suffixe est explicite ici.
@@ -99,9 +108,10 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound();
   }
 
-  const [comments, { articles: popularArticles }] = await Promise.all([
+  const [comments, { articles: popularArticles }, relatedArticles] = await Promise.all([
     getCommentsByArticle(article.id),
     getArticles({ limit: 4 }),
+    getRelatedArticles(article),
   ]);
 
   const categoryName = article.category?.name || 'Modèles';
@@ -289,6 +299,12 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                 {article.content}
               </ReactMarkdown>
             </div>
+
+            {/* MAILLAGE INTERNE — placé AVANT les commentaires et la publicité :
+                c'est le contenu que le lecteur cherche en fin d'article, et les
+                liens sont d'autant mieux valorisés qu'ils sont haut dans le
+                document. */}
+            <RelatedArticles articles={relatedArticles} />
 
             {/* EMBED PUB BAS D'ARTICLE */}
             <AdBanner format="auto" label="Recommandation — Outils IA" />

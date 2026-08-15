@@ -121,32 +121,60 @@ Ils font la valeur du site — les préserver.
 
 ## Ce qui reste à faire
 
-**Quatre actions manuelles, à faire dans cet ordre — le site est en ligne.**
+**Vérifié en production le 14 août 2026 — ces deux points sont RÉGLÉS**, ne pas
+les rouvrir : `SUPABASE_SERVICE_ROLE_KEY` est bien présente sur Vercel (sans
+elle, `page_views` serait vide ; elle contient 29 lignes horodatées), et
+`NEXT_PUBLIC_SITE_URL` sert bien `https://www.ia-decodee.tech` (canoniques et
+sitemap vérifiés en ligne).
 
-0. **Exécuter `supabase_patch_programmation.sql`.** Sans lui, la programmation
-   des parutions tient uniquement au filtre applicatif : un article programmé
-   reste invisible sur le site, mais l'API PostgREST le sert à qui interroge la
-   base directement avec la clé publique.
+Restent :
 
 1. **Exécuter `supabase_patch_securite.sql`** dans Supabase > SQL Editor. Tant
    que ce n'est pas fait, n'importe qui peut injecter de fausses vues depuis un
    pays inventé avec la seule clé publique (vérifié en conditions réelles).
-2. **Ajouter `SUPABASE_SERVICE_ROLE_KEY` aux variables Vercel.** Le comptage des
-   vues passe désormais par elle ; sans cette variable, il s'arrête en silence.
-3. **Corriger `NEXT_PUBLIC_SITE_URL` dans Vercel** → `https://www.ia-decodee.tech`
-   (portée Production). Elle valait l'URL `*.vercel.app` générée, ce qui envoyait
-   tout le référencement sur le mauvais domaine. Le garde-fou de
-   `site-config.ts` fait maintenant **échouer le build** sur `localhost` comme
-   sur `*.vercel.app`.
-
-Ensuite :
-
-4. **Fermer les inscriptions publiques** dans Supabase (Authentication > Sign In /
+2. **Search Console : soumettre le sitemap, puis demander l'indexation des 12
+   URLs une par une.** C'est l'action à plus fort effet du moment — voir
+   l'audit de référencement ci-dessous.
+3. **Fermer les inscriptions publiques** dans Supabase (Authentication > Sign In /
    Providers > Email).
-5. **Mettre à jour le comparatif après le 31 août 2026** : le tarif
+4. **Mettre à jour le comparatif après le 31 août 2026** : le tarif
    d'introduction de Claude Sonnet 5 ($2/$10) passe à $3/$15 — c'est écrit dans
    l'article, il deviendra faux.
-6. Éventuellement étoffer « Bien rédiger un prompt » (14 min contre 32 et 36).
+
+---
+
+## Audit de référencement du 14 août 2026
+
+**Le compteur de vues n'a jamais été cassé.** 29 vues réelles en base, empreintes
+et pays renseignés. Ce qui semblait « bloqué » était **le nombre affiché** : les
+pages d'articles étaient servies depuis le cache Vercel avec `Age: 602684`, soit
+sept jours sans régénération. Corrigé par `export const revalidate = 60`. Ne pas
+rechercher un bug de comptage : il n'y en a pas.
+
+**Le vrai problème est l'absence de visiteurs.** Sur 29 vues, **zéro** venait
+d'un moteur de recherche : 28 referrers internes, 1 localhost. Les vues « US »
+portent des user-agents de robots (`Nexus 5 Build/MRA58N`). `site:ia-decodee.tech`
+ne renvoie rien.
+
+**Le sitemap ne déclarait que 3 articles sur 12** — figé au dernier build, faute
+de `revalidate` ; `revalidatePath('/sitemap.xml')` ne le rafraîchit pas. Neuf
+articles n'ont jamais été soumis à Google. Corrigé.
+
+**Le nom de marque est occupé.** « IA Décodée » est la série éditoriale d'NVIDIA
+(*AI Decoded*), une émission spéciale de Radio-Canada et un cours UNESCO. Le
+trafic de marque — le premier trafic d'un site jeune — est donc inaccessible.
+Ce n'est pas un bug : c'est une décision stratégique en attente.
+
+**Cannibalisation** : contrairement à une première lecture trop rapide, les deux
+articles AI Act ne se concurrencent PAS (l'un est informationnel, l'autre
+transactionnel — ils forment une grappe). Le vrai doublon est entre
+« Comparatif des modèles IA 2026 » et « Claude Opus 5, GPT-5.6, Gemini 3.6 : le
+comparatif des tarifs réels », qui visent tous deux la comparaison tarifaire.
+Arbitrage éditorial en attente — aucun article n'a été supprimé.
+
+**Rythme de publication** : 12 articles en 8 jours sur un domaine de deux
+semaines. Le profil ressemble à de la production de masse. Viser 1 à 2 articles
+par semaine sert mieux le référencement.
 
 ---
 
