@@ -2,10 +2,27 @@ import { MetadataRoute } from 'next';
 import { getArticles, getCategories } from '@/lib/api-articles';
 import { siteConfig } from '@/lib/site-config';
 
-/* Le plan de site ne doit pas annoncer un article encore programmé : Google
-   suivrait l'URL et n'y trouverait rien. `getArticles` l'écarte déjà, encore
-   faut-il que ce fichier soit régénéré à l'échéance — d'où la revalidation. */
-export const revalidate = 60;
+/*
+ * Plan de site rendu à la demande, et non mis en cache.
+ *
+ * ── Pourquoi pas d'ISR ici ───────────────────────────────────────────────────
+ * `export const revalidate = 60` a d'abord été essayé, et ne suffit pas :
+ * vérifié en production, le plan de site restait servi avec `X-Vercel-Cache:
+ * HIT` et un `Age` supérieur à la fenêtre de revalidation, sans jamais se
+ * régénérer. Un article publié n'y apparaissait donc pas — c'est exactement le
+ * défaut qui avait laissé 9 articles sur 12 hors du plan de site, invisibles de
+ * Google pendant une semaine.
+ *
+ * Le coût du rendu dynamique est ici négligeable, et c'est ce qui rend
+ * l'arbitrage facile : cette route n'est demandée que par des robots
+ * d'indexation, quelques dizaines de fois par jour, contre deux requêtes
+ * Supabase à chaque appel. Un plan de site faux coûte infiniment plus cher
+ * qu'un plan de site recalculé.
+ *
+ * Le flux RSS, lui, garde son ISR : c'est un Route Handler, il fixe ses propres
+ * en-têtes de cache et se régénère correctement (vérifié en production).
+ */
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [{ articles }, categories] = await Promise.all([
