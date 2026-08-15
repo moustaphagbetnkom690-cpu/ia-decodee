@@ -132,9 +132,12 @@ Restent :
 1. **Exécuter `supabase_patch_securite.sql`** dans Supabase > SQL Editor. Tant
    que ce n'est pas fait, n'importe qui peut injecter de fausses vues depuis un
    pays inventé avec la seule clé publique (vérifié en conditions réelles).
-2. **Search Console : soumettre le sitemap, puis demander l'indexation des 12
-   URLs une par une.** C'est l'action à plus fort effet du moment — voir
-   l'audit de référencement ci-dessous.
+2. **Search Console : soumettre le sitemap, puis demander l'indexation des 13
+   URLs une par une.** C'est l'action à plus fort effet du moment, et **elle ne
+   peut pas être automatisée** : Google n'expose aucune API pour « Demander
+   l'indexation », et son Indexing API est réservée aux balisages `JobPosting`
+   et `BroadcastEvent`. Ne pas chercher de contournement, il n'y en a pas.
+   Bing, Yandex, Naver et Seznam sont déjà couverts par IndexNow (§ ci-dessous).
 3. **Fermer les inscriptions publiques** dans Supabase (Authentication > Sign In /
    Providers > Email).
 4. **Mettre à jour le comparatif après le 31 août 2026** : le tarif
@@ -168,6 +171,15 @@ avec un `Age` bien supérieur à la fenêtre, sans jamais se régénérer. Seul
 est nul : seuls des robots demandent cette route. Le flux RSS, lui, garde son
 ISR — c'est un Route Handler, il fixe ses propres en-têtes et se régénère
 correctement (vérifié).
+
+**IndexNow est en place** (`src/lib/indexnow.ts`). Chaque article publié depuis
+le panel est signalé automatiquement à Bing, Yandex, Naver et Seznam, qui se
+partagent les soumissions. Les 24 URLs du site ont été soumises le 15 août 2026
+(HTTP 202). **Google n'y participe pas** — ne pas confondre les deux canaux.
+
+La clé est en clair dans le code et publiée dans `public/<clé>.txt` : le
+protocole l'exige, le moteur la lit à cette adresse pour vérifier qu'on contrôle
+le domaine. Ne pas « sécuriser » ce fichier, ce serait casser la vérification.
 
 **Le nom de marque est occupé.** « IA Décodée » est la série éditoriale d'NVIDIA
 (*AI Decoded*), une émission spéciale de Radio-Canada et un cours UNESCO. Le
