@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
 import { slugify, siteLocalToISO, formatDateHeure } from '@/lib/utils';
 import { SITE_PATHS } from '@/lib/site-links';
+import { siteConfig } from '@/lib/site-config';
 
 /**
  * Écritures du back-office.
@@ -66,6 +67,31 @@ function revalidateArticleSurfaces(slug?: string) {
   revalidatePath('/admin/articles');
   revalidatePath('/sitemap.xml');
   if (slug) revalidatePath(`/blog/${slug}`);
+}
+
+/**
+ * Signale un article aux moteurs qui acceptent IndexNow (Bing, Yandex, Naver,
+ * Seznam). Sans effet sur Google, qui n'a pas adopté le protocole — voir
+ * `src/lib/indexnow.ts`.
+ *
+ * Volontairement silencieux et sans `await` bloquant l'issue de l'action : le
+ * signalement est un bonus, son échec ne doit jamais empêcher un article d'être
+ * enregistré. Un article programmé n'est pas signalé, sa page n'existant pas
+ * encore publiquement.
+ */
+async function signalerAuxMoteurs(slug: string, publie: boolean, publishedAt: string) {
+  if (!publie || new Date(publishedAt).getTime() > Date.now()) return;
+
+  const { notifierIndexNow } = await import('@/lib/indexnow');
+  const resultat = await notifierIndexNow([
+    `${siteConfig.url}/blog/${slug}`,
+    `${siteConfig.url}/blog`,
+    siteConfig.url,
+  ]);
+
+  if (!resultat.ok) {
+    console.warn('[indexnow] signalement refusé :', resultat.statut, resultat.message);
+  }
 }
 
 /**
@@ -182,6 +208,7 @@ export async function saveArticle(
 
     revalidateArticleSurfaces(slug);
     if (avant?.slug && avant.slug !== slug) revalidateArticleSurfaces(avant.slug);
+    await signalerAuxMoteurs(slug, status === 'published', publishedAt);
 
     return { ok: true, message: confirmation('mis à jour'), articleId: id };
   }
@@ -195,6 +222,8 @@ export async function saveArticle(
   if (error) return fail(`Échec de la création : ${error.message}`);
 
   revalidateArticleSurfaces(slug);
+  await signalerAuxMoteurs(slug, status === 'published', publishedAt);
+
   return { ok: true, message: confirmation('créé'), articleId: data.id };
 }
 
